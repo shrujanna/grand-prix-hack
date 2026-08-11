@@ -33,6 +33,7 @@ type OpenF1Radio = {
 interface OpenF1RadioArchiveProps {
   onClipSelect: (clip: any) => void;
   selectedClipId?: string;
+  compact?: boolean;
 }
 
 const apiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
@@ -47,7 +48,7 @@ const selectStyle: React.CSSProperties = {
   fontSize: '0.75rem',
 };
 
-export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSelect, selectedClipId }) => {
+export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSelect, selectedClipId, compact = false }) => {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(Math.min(currentYear, 2025));
   const [sessions, setSessions] = useState<OpenF1Session[]>([]);
@@ -177,10 +178,10 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: '0.85rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
-        <div>
+        {!compact && <div>
           <h2 style={{ fontSize: '1rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>RADIO ARCHIVE</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', marginTop: '0.2rem' }}>OPENF1 RADIO • FASTF1 LAP CONTEXT</p>
-        </div>
+        </div>}
         <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>{filteredRadios.length} SIGNALS</span>
       </div>
 
@@ -210,7 +211,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
 
       {error && <p role="alert" style={{ color: 'var(--mood-frustrated)', fontSize: '0.75rem' }}>{error}</p>}
 
-      <div style={{ flex: 1, minHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingRight: '0.25rem' }}>
+      <div style={{ height: compact ? 236 : undefined, flex: compact ? '0 0 auto' : 1, minHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingRight: '0.25rem' }}>
         {loadingSessions || loadingRadios ? <LoadingState message={loadingSessions ? 'LOADING OPENF1 ARCHIVE...' : 'TUNING RADIO CHANNEL...'} /> : filteredRadios.length === 0 ? (
           <p style={{ padding: '1.5rem 0.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>No radio recordings for these filters.</p>
         ) : filteredRadios.map((radio) => {

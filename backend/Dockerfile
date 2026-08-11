@@ -10,6 +10,7 @@ WORKDIR /app
 # Install system dependencies (required for some math/audio libs if added later)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies

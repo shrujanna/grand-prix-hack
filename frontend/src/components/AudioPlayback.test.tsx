@@ -5,7 +5,7 @@ import { AudioPlayback } from './AudioPlayback'
 
 describe('AudioPlayback', () => {
   it('provides standard playback and speed controls for a radio clip', () => {
-    const { container } = render(<AudioPlayback audioUrl="/media/radio.mp3" transcript="Box, box this lap." />)
+    const { container } = render(<AudioPlayback audioUrl="/media/radio.mp3" />)
 
     const audio = container.querySelector('audio')
     expect(audio).toHaveAttribute('controls')

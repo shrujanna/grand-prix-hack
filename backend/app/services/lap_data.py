@@ -76,17 +76,26 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
         print(f"Error fetching FastF1 session laps: {e}")
         return []
 
-def map_timestamp_to_lap(year: int, gp: str, session_type: str, msg_datetime: datetime.datetime) -> Tuple[Optional[float], Optional[bool]]:
+def map_timestamp_to_lap(
+    year: int,
+    gp: str,
+    session_type: str,
+    driver_code: str,
+    msg_datetime: datetime.datetime,
+) -> Tuple[Optional[float], Optional[bool]]:
     """
-    Maps an absolute UTC datetime to a session lap number.
-    Returns (lap_number, is_ambiguous).
+    Maps an absolute UTC datetime to the selected driver's current lap.
+
+    FastF1 stores all drivers' laps in one table. We must first isolate the
+    selected driver and sort by lap-completion time; otherwise the first future
+    row can belong to a different driver's lap 1.
     """
     event_name = _normalize_gp_name(gp)
     try:
         session = fastf1.get_session(year, event_name, session_type)
         session.load(telemetry=False, weather=False, messages=False)
         
-        session_start = session.session_info.get('StartDate')
+        session_start = session.session_info.get('StartDate') or session.date
         if not session_start:
             return None, True
             
@@ -99,13 +108,13 @@ def map_timestamp_to_lap(year: int, gp: str, session_type: str, msg_datetime: da
             msg_datetime = msg_datetime.replace(tzinfo=datetime.timezone.utc)
             
         time_offset = msg_datetime - session_start
-        
-        # We need laps from the whole session to find the window
-        laps = session.laps
-        
-        # This is a simplified approximate match using Time (session-relative time of lap completion)
-        # We find the first lap that completed *after* our message time
-        future_laps = laps[laps['Time'] > time_offset]
+        if time_offset < pd.Timedelta(0):
+            return None, True
+
+        # A radio during lap N falls before the timestamp when driver N
+        # completes that lap, so the next completion identifies the current lap.
+        driver_laps = session.laps.pick_driver(driver_code).dropna(subset=['Time', 'LapNumber'])
+        future_laps = driver_laps[driver_laps['Time'] > time_offset].sort_values('Time')
         if not future_laps.empty:
             return float(future_laps.iloc[0]['LapNumber']), False
             

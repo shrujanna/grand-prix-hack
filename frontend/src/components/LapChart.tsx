@@ -12,9 +12,21 @@ interface LapChartProps {
   year?: number;
   selectedClipId?: string;
   selectedLapNumber?: number | null;
+  lapTimes?: number[];
 }
 
-export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 2026, selectedClipId, selectedLapNumber }) => {
+const toLapPoints = (lapTimes: number[]) => {
+  const sorted = [...lapTimes].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  return lapTimes.map((lapTime, index) => ({
+    lap_number: index + 1,
+    lap_time: lapTime,
+    delta_from_median: lapTime - median,
+  }));
+};
+
+export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 2026, selectedClipId, selectedLapNumber, lapTimes }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +34,12 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
 
   useEffect(() => {
     const fetchLaps = async () => {
+      if (lapTimes?.length) {
+        setLoading(false);
+        setError(null);
+        setData(toLapPoints(lapTimes));
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -44,7 +62,7 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
     };
 
     fetchLaps();
-  }, [gp, session, driver, year]);
+  }, [gp, session, driver, year, lapTimes]);
 
   // CSS variables are tricky in recharts config, so we map them directly
   const getMoodColor = (mood?: string) => {
@@ -79,7 +97,7 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
     }
     
     // Normal lap point
-    return <circle cx={cx} cy={cy} r={2} fill="rgba(255,255,255,0.2)" />;
+    return <circle cx={cx} cy={cy} r={data.length === 1 ? 8 : 2} fill={data.length === 1 ? 'var(--accent-f1)' : 'rgba(255,255,255,0.2)'} />;
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -114,7 +132,7 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
     : data;
 
   const chartData = slowerLapsOnly
-    ? dataWithSelectedRadio.map((lap) => lap.delta_from_median && lap.delta_from_median > 0 ? lap : { ...lap, clip_id: null, human_label: null })
+    ? dataWithSelectedRadio.filter((lap) => typeof lap.delta_from_median === 'number' && lap.delta_from_median > 0)
     : dataWithSelectedRadio;
 
   return (
@@ -125,6 +143,9 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
           <input type="checkbox" checked={slowerLapsOnly} onChange={(event) => setSlowerLapsOnly(event.target.checked)} /> Slower laps only
         </label>
       </div>
+      {data.length === 1 && !loading && !error && (
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '-0.55rem', marginBottom: '0.55rem' }}>ONE LAP ENTERED — ADD MORE LAP TIMES TO SEE A PERFORMANCE TREND.</p>
+      )}
       
       <div style={{ flex: 1, minHeight: 0 }}>
         {loading ? (
@@ -132,6 +153,10 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
         ) : error ? (
           <div style={{ color: 'var(--mood-frustrated)', textAlign: 'center', paddingTop: '2rem' }}>
             {error}
+          </div>
+        ) : chartData.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', textAlign: 'center', paddingTop: '2rem' }}>
+            No laps slower than this driver&apos;s session median.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

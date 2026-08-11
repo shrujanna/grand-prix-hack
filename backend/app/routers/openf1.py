@@ -2,8 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services.openf1 import OpenF1Error, list_drivers, list_sessions, list_team_radio, radio_context
-from app.services.lap_data import map_timestamp_to_lap, parse_openf1_datetime
+from app.services.openf1 import OpenF1Error, list_drivers, list_sessions, list_team_radio, map_radio_to_lap, radio_context
 
 
 router = APIRouter(prefix="/api/openf1", tags=["OpenF1 radio archive"])
@@ -52,18 +51,9 @@ def get_radio_context(
     except OpenF1Error as error:
         raise _unavailable(error) from error
 
-    lap_number = None
-    lap_is_ambiguous = True
     try:
-        message_time = parse_openf1_datetime(date)
-        if context.get("year") and message_time:
-            lap_number, lap_is_ambiguous = map_timestamp_to_lap(
-                int(context["year"]),
-                context["gp"],
-                context["session"],
-                message_time,
-            )
-    except (TypeError, ValueError):
-        pass
+        lap_number, lap_is_ambiguous = map_radio_to_lap(session_key, driver_number, date)
+    except OpenF1Error:
+        lap_number, lap_is_ambiguous = None, True
 
     return {**context, "lap_number": lap_number, "lap_is_ambiguous": lap_is_ambiguous}

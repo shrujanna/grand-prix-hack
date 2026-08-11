@@ -56,6 +56,8 @@ def _service_error(service: str, error: Exception) -> tuple[str, str]:
         return "unavailable", "The analysis provider is temporarily unavailable. Please retry."
     if "could not be reached" in error_text or "request failed" in error_text:
         return "unavailable", "The analysis provider could not be reached. Please retry."
+    if service == "audio":
+        return "failed", "Voice tone could not be isolated after radio-noise cleanup. Transcript sentiment is still available; retry if you have a cleaner source."
     return "failed", "This analysis could not be completed. Please retry with a clear audio clip."
 
 

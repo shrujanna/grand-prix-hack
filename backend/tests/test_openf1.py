@@ -14,6 +14,7 @@ class OpenF1AdapterTests(unittest.TestCase):
         openf1.list_sessions.cache_clear()
         openf1.get_session.cache_clear()
         openf1.list_drivers.cache_clear()
+        openf1.list_laps.cache_clear()
 
     @patch("app.services.openf1._get")
     def test_enriches_radio_with_driver_data(self, get):
@@ -38,3 +39,16 @@ class OpenF1AdapterTests(unittest.TestCase):
         sessions = openf1.list_sessions(2025)
 
         self.assertEqual(sessions[0]["meeting_name"], "Australian Grand Prix")
+
+    @patch("app.services.openf1._get")
+    def test_maps_radio_to_the_drivers_current_openf1_lap(self, get):
+        get.return_value = [
+            {"lap_number": 1, "date_start": "2025-03-16T04:00:00+00:00"},
+            {"lap_number": 2, "date_start": "2025-03-16T04:01:31+00:00"},
+            {"lap_number": 58, "date_start": "2025-03-16T05:28:07+00:00"},
+        ]
+
+        lap, ambiguous = openf1.map_radio_to_lap(999, 1, "2025-03-16T05:28:45+00:00")
+
+        self.assertEqual(lap, 58.0)
+        self.assertFalse(ambiguous)

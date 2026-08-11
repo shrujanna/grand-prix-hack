@@ -1,9 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 
 interface AudioPlaybackProps {
   audioUrl: string;
-  transcript?: string | null;
   title?: string;
 }
 
@@ -13,13 +12,9 @@ const apiAudioUrl = (audioUrl: string) => {
   return `${baseUrl}${audioUrl.startsWith('/') ? audioUrl : `/${audioUrl}`}`;
 };
 
-export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, transcript, title = 'Radio playback' }) => {
+export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, title = 'Radio playback' }) => {
   const playerRef = useRef<HTMLAudioElement>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
-  const words = useMemo(() => transcript?.split(/\s+/).filter(Boolean) ?? [], [transcript]);
-  const highlightedWordCount = duration > 0 ? Math.ceil((currentTime / duration) * words.length) : 0;
 
   const changeSpeed = (nextSpeed: number) => {
     setSpeed(nextSpeed);
@@ -42,19 +37,8 @@ export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, transcri
         controls
         preload="metadata"
         src={apiAudioUrl(audioUrl)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         style={{ width: '100%', height: '40px', outline: 'none' }}
       />
-      {words.length > 0 && (
-        <p aria-live="off" style={{ marginTop: '0.75rem', fontSize: '0.875rem', lineHeight: 1.65, color: 'var(--text-secondary)' }}>
-          {words.map((word, index) => (
-            <span key={`${word}-${index}`} style={{ color: index < highlightedWordCount ? 'var(--text-primary)' : undefined, background: index < highlightedWordCount ? 'rgba(225, 6, 0, 0.18)' : 'transparent', borderRadius: '2px', marginRight: '0.25rem' }}>
-              {word}
-            </span>
-          ))}
-        </p>
-      )}
     </section>
   );
 };

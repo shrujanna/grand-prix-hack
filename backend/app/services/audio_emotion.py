@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 import requests
 from typing import Dict, Any
@@ -20,6 +21,34 @@ EMOTION_MAPPING = {
     "neutral": "neutral"
 }
 
+
+def _clean_radio_audio(audio_bytes: bytes) -> bytes:
+    """Make noisy team-radio audio more usable for a speech-emotion model.
+
+    Formula 1 radio commonly contains engine noise, compression artefacts, and
+    very uneven gain. This keeps speech frequencies, applies light denoising,
+    limits peaks, and converts to mono 16 kHz WAV. If ffmpeg cannot decode a
+    clip, the original bytes are still sent so analysis never becomes blocked.
+    """
+    if os.environ.get("AUDIO_DENOISE_ENABLED", "true").lower() in {"0", "false", "no"}:
+        return audio_bytes
+    try:
+        process = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+                "-af", "highpass=f=120,lowpass=f=7000,afftdn=nf=-25,alimiter=limit=0.95",
+                "-ar", "16000", "-ac", "1", "-f", "wav", "pipe:1",
+            ],
+            input=audio_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=20,
+        )
+        return process.stdout if process.returncode == 0 and len(process.stdout) > 512 else audio_bytes
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return audio_bytes
+
 def classify_audio_emotion(audio_bytes: bytes) -> Dict[str, Any]:
     """
     Sends audio bytes to Hugging Face Inference API and returns mapped emotion and confidence.
@@ -38,10 +67,11 @@ def classify_audio_emotion(audio_bytes: bytes) -> Dict[str, Any]:
         timeout = DEFAULT_TIMEOUT_SECONDS
 
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/octet-stream"}
+    prepared_audio = _clean_radio_audio(audio_bytes)
     response = None
     for attempt in range(3):
         try:
-            response = requests.post(api_url, headers=headers, data=audio_bytes, timeout=timeout)
+            response = requests.post(api_url, headers=headers, data=prepared_audio, timeout=timeout)
         except requests.RequestException as exc:
             if attempt == 2:
                 raise RuntimeError("Audio-tone analysis provider could not be reached.") from exc

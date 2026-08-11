@@ -1,8 +1,12 @@
-import requests
-import json
+import os
 
-HF_API_KEY = "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"
-headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+import requests
+
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    raise SystemExit("Set HF_TOKEN before running this script.")
+
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 models = [
     "superb/wav2vec2-base-superb-er",

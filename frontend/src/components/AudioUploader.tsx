@@ -27,11 +27,13 @@ export interface AnalysisResult {
   audio_url?: string | null;
   source?: 'live';
   uploaded_at?: string | null;
+  lap_times?: number[];
 }
 
 interface AudioUploaderProps {
   onAnalysisComplete: (data: AnalysisResult) => void;
   onError: (error: string) => void;
+  onTelemetryChange?: (telemetry: { lapTimes: number[]; lapNumber: number | null }) => void;
 }
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -42,6 +44,7 @@ interface LiveContext {
   gp: string;
   session: string;
   lapNumber: string;
+  lapTimes: string;
 }
 
 const defaultContext: LiveContext = {
@@ -50,6 +53,7 @@ const defaultContext: LiveContext = {
   gp: '',
   session: 'Race',
   lapNumber: '',
+  lapTimes: '',
 };
 
 const serviceDetails: Array<{ name: ServiceName; label: string; statusKey: keyof AnalysisResult; errorKey: keyof AnalysisResult }> = [
@@ -62,6 +66,20 @@ const statusColor = (status: ServiceStatus) => {
   if (status === 'completed' || status === 'provided') return 'var(--mood-happy)';
   if (status === 'skipped') return 'var(--text-muted)';
   return 'var(--mood-frustrated)';
+};
+
+const parseLapTimes = (value: string): number[] => {
+  if (!value.trim()) return [];
+  return value.split(/[\s,;]+/).filter(Boolean).map((entry) => {
+    const parts = entry.split(':');
+    const seconds = parts.length === 2
+      ? Number(parts[0]) * 60 + Number(parts[1])
+      : Number(entry);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 1000) {
+      throw new Error(`"${entry}" is not a valid lap time. Use seconds (91.677) or m:ss.sss (1:31.677).`);
+    }
+    return seconds;
+  });
 };
 
 const mergeRetryResult = (
@@ -96,7 +114,7 @@ const mergeRetryResult = (
   return merged;
 };
 
-export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete, onError }) => {
+export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete, onError, onTelemetryChange }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -151,9 +169,36 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
     if (context.lapNumber) formData.append('lap_number', context.lapNumber);
   };
 
+  const updateLapTimes = (lapTimes: string) => {
+    const nextContext = { ...context, lapTimes };
+    setContext(nextContext);
+    try {
+      onTelemetryChange?.({
+        lapTimes: parseLapTimes(lapTimes),
+        lapNumber: nextContext.lapNumber ? Number(nextContext.lapNumber) : null,
+      });
+    } catch {
+      // Validation is shown when the operator starts analysis, not while typing.
+    }
+  };
+
+  const updateLapNumber = (lapNumber: string) => {
+    const nextContext = { ...context, lapNumber };
+    setContext(nextContext);
+    try {
+      onTelemetryChange?.({
+        lapTimes: parseLapTimes(nextContext.lapTimes),
+        lapNumber: lapNumber ? Number(lapNumber) : null,
+      });
+    } catch {
+      // See updateLapTimes.
+    }
+  };
+
   const analyzeFile = async (file: File, retryServices?: ServiceName[], saveClip = true) => {
     try {
       validateFile(file);
+      const lapTimes = parseLapTimes(context.lapTimes);
       setIsProcessing(true);
       setProgress(10);
       setPhase(retryServices ? 'RETRYING FAILED ANALYSIS...' : 'VALIDATING RADIO CLIP...');
@@ -192,7 +237,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
       const next = await response.json() as AnalysisResult;
       const result = retryServices && analysis
         ? mergeRetryResult(analysis, next, retryServices)
-        : next;
+        : { ...next, lap_times: lapTimes };
       setAnalysis(result);
       onAnalysisComplete(result);
       setProgress(100);
@@ -317,7 +362,9 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
         <select aria-label="Session" value={context.session} onChange={(event) => setContext({ ...context, session: event.target.value })} style={{ background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.55rem' }}>
           <option>Race</option><option>Qualifying</option><option>Sprint</option><option>Practice</option><option>Live</option>
         </select>
-        <input aria-label="Lap number" type="number" min="1" step="1" value={context.lapNumber} onChange={(event) => setContext({ ...context, lapNumber: event.target.value })} placeholder="Lap number (optional)" style={{ gridColumn: 'span 2', background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.55rem' }} />
+        <input aria-label="Lap number" type="number" min="1" step="1" value={context.lapNumber} onChange={(event) => updateLapNumber(event.target.value)} placeholder="Lap number (optional)" style={{ gridColumn: 'span 2', background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.55rem' }} />
+        <textarea aria-label="Lap times" value={context.lapTimes} onChange={(event) => updateLapTimes(event.target.value)} placeholder="Lap times: 1:31.677, 1:30.442, 1:31.005 …" rows={3} style={{ gridColumn: 'span 2', resize: 'vertical', background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.55rem', fontFamily: 'var(--font-mono)' }} />
+        <p style={{ gridColumn: 'span 2', color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '-0.2rem' }}>PASTE LAP TIMES IN ORDER. ACCEPTS SECONDS OR M:SS.SSS; THIS POWERS THE LIVE CHART.</p>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
@@ -341,7 +388,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
       {audioUrl && (
         <div style={{ marginTop: '1.5rem' }}>
           {lastFile && <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.25rem' }}>{lastFile.name} · {(lastFile.size / 1024 / 1024).toFixed(2)} MB{analysis?.audio_duration_seconds ? ` · ${analysis.audio_duration_seconds.toFixed(1)}s` : ''}</p>}
-          <AudioPlayback audioUrl={audioUrl} transcript={analysis?.transcript || liveTranscript} title="Uploaded radio playback" />
+          <AudioPlayback audioUrl={audioUrl} title="Uploaded radio playback" />
         </div>
       )}
 

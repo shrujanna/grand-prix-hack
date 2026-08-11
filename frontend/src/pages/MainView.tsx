@@ -26,6 +26,17 @@ export const MainView: React.FC = () => {
     setAnalysisError(null);
   };
 
+  const handleLiveTelemetryChange = (telemetry: { lapTimes: number[]; lapNumber: number | null }) => {
+    if (!isLiveUpload) return;
+    setActiveData((current: any) => current ? {
+      ...current,
+      lap_times: telemetry.lapTimes,
+      lap_number: telemetry.lapNumber ?? current.lap_number,
+    } : current);
+  };
+
+  const hasEnteredLapTimes = Array.isArray(activeData?.lap_times) && activeData.lap_times.length > 0;
+
   const analyzeSelectedOpenF1Radio = async () => {
     if (!activeData?.session_key || !activeData?.driver_number || !activeData?.date) return;
     setAnalyzingOpenF1(true);
@@ -81,7 +92,7 @@ export const MainView: React.FC = () => {
               LIVE TELEMETRY INPUT <span style={{ color: 'var(--text-muted)' }}>— upload or record a new radio</span>
             </summary>
             <div style={{ marginTop: '1rem' }}>
-              <AudioUploader onAnalysisComplete={handleLiveUpload} onError={setAnalysisError} />
+              <AudioUploader onAnalysisComplete={handleLiveUpload} onError={setAnalysisError} onTelemetryChange={handleLiveTelemetryChange} />
             </div>
           </details>
           {analysisError && (
@@ -90,12 +101,18 @@ export const MainView: React.FC = () => {
             </div>
           )}
           
-          <Card variant="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 620, padding: '1rem' }}>
-            <OpenF1RadioArchive
-              onClipSelect={handleLibrarySelect}
-              selectedClipId={!isLiveUpload && activeData ? activeData.clip_id : undefined}
-            />
-          </Card>
+          <details style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-panel)', padding: '0.8rem 1rem' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+              RADIO ARCHIVE <span style={{ color: 'var(--text-muted)' }}>— OpenF1 recordings and FastF1 lap context</span>
+            </summary>
+            <div style={{ marginTop: '0.85rem' }}>
+              <OpenF1RadioArchive
+                compact
+                onClipSelect={handleLibrarySelect}
+                selectedClipId={!isLiveUpload && activeData ? activeData.clip_id : undefined}
+              />
+            </div>
+          </details>
         </div>
 
         {/* Selected radio detail and matching FastF1 timing */}
@@ -115,7 +132,7 @@ export const MainView: React.FC = () => {
                   textStatus={activeData.text_analysis_status}
                 />
                 {activeData.audio_url && (
-                  <AudioPlayback audioUrl={activeData.audio_url} transcript={activeData.transcript || activeData.text} title="Selected team radio" />
+                  <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" />
                 )}
                 {activeData.source === 'openf1' && (
                   <button
@@ -130,21 +147,22 @@ export const MainView: React.FC = () => {
               </div>
 
               {/* Bottom Right: Telemetry Chart */}
-              {activeData.gp && activeData.session && activeData.driver_code && activeData.driver_code !== 'LIVE' && activeData.gp !== 'Live uploads' ? (
+              {hasEnteredLapTimes || (activeData.gp && activeData.session && activeData.driver_code && activeData.driver_code !== 'LIVE' && activeData.gp !== 'Live uploads') ? (
                 <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <LapChart 
-                    gp={activeData.gp} 
-                    session={activeData.session} 
-                    driver={activeData.driver_code} 
+                    gp={activeData.gp || ''}
+                    session={activeData.session || ''}
+                    driver={activeData.driver_code || 'LIVE'}
                     year={activeData.year}
                     selectedClipId={activeData.clip_id}
                     selectedLapNumber={activeData.lap_number}
+                    lapTimes={activeData.lap_times}
                   />
                 </div>
               ) : (
                 <Card variant="glass" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
-                    ADD A DRIVER, GRAND PRIX, SESSION, AND LAP TO LINK THIS RADIO CLIP WITH TELEMETRY.
+                    PASTE LAP TIMES IN LIVE TELEMETRY INPUT TO DRAW A CHART, OR SELECT AN ARCHIVED RADIO FOR FASTF1 DATA.
                   </p>
                 </Card>
               )}

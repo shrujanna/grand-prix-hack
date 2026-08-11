@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import datetime
 import os
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -128,6 +129,48 @@ def radio_context(session_key: int, driver_number: int, date: str) -> Dict[str, 
         "team_name": driver.get("team_name"),
         "date": date,
     }
+
+
+@lru_cache(maxsize=256)
+def list_laps(session_key: int, driver_number: int) -> List[Dict[str, Any]]:
+    laps = _get("laps", {"session_key": session_key, "driver_number": driver_number})
+    return sorted(laps, key=lambda item: item.get("date_start") or "")
+
+
+def map_radio_to_lap(session_key: int, driver_number: int, radio_date: str) -> tuple[Optional[float], bool]:
+    """Map a radio timestamp to the driver's lap using OpenF1's own clock.
+
+    This deliberately avoids comparing two providers' session start timestamps.
+    A radio belongs to the most recent lap that started at or before its time.
+    FastF1 remains the source for plotted lap durations.
+    """
+    try:
+        radio_time = datetime.datetime.fromisoformat(radio_date.replace("Z", "+00:00"))
+    except ValueError:
+        return None, True
+    if radio_time.tzinfo is None:
+        radio_time = radio_time.replace(tzinfo=datetime.timezone.utc)
+
+    current_lap: Optional[Dict[str, Any]] = None
+    for lap in list_laps(session_key, driver_number):
+        date_start = lap.get("date_start")
+        lap_number = lap.get("lap_number")
+        if not date_start or lap_number is None:
+            continue
+        try:
+            lap_start = datetime.datetime.fromisoformat(date_start.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if lap_start.tzinfo is None:
+            lap_start = lap_start.replace(tzinfo=datetime.timezone.utc)
+        if lap_start <= radio_time:
+            current_lap = lap
+        else:
+            break
+
+    if current_lap is None:
+        return None, True
+    return float(current_lap["lap_number"]), False
 
 
 def download_team_radio(session_key: int, driver_number: int, date: str) -> tuple[bytes, str, str]:
