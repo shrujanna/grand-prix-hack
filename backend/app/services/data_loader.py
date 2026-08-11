@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from typing import List, Optional
 from app.models.schemas import Clip, MoodLabel
+from app.services.live_clips import list_live_clips
 
 _clips_cache: List[Clip] = []
 
@@ -33,6 +34,7 @@ def _load_data():
                 "human_label": MoodLabel(str(row["human_label"]).strip()) if pd.notna(row["human_label"]) else None,
                 "human_label_intensity": int(row["human_label_intensity"]) if pd.notna(row["human_label_intensity"]) else None,
                 "audio_model_label": str(row["audio_model_label"]) if pd.notna(row["audio_model_label"]) else None,
+                "audio_model_confidence": float(row["audio_model_confidence"]) if "audio_model_confidence" in df.columns and pd.notna(row["audio_model_confidence"]) else None,
                 "text_model_label": str(row["text_model_label"]) if pd.notna(row["text_model_label"]) else None,
                 "lap_number": float(row["lap_number"]) if pd.notna(row["lap_number"]) else None,
                 "lap_is_ambiguous": bool(row["lap_is_ambiguous"]) if pd.notna(row["lap_is_ambiguous"]) else None,
@@ -46,16 +48,16 @@ def _load_data():
 
 def get_all_clips() -> List[Clip]:
     """Returns all loaded clips."""
-    return _load_data()
+    return [*list_live_clips(), *_load_data()]
 
 def get_clip(clip_id: str) -> Optional[Clip]:
     """Returns a specific clip by ID."""
-    clips = _load_data()
+    clips = get_all_clips()
     return next((clip for clip in clips if clip.clip_id == clip_id), None)
 
 def filter_clips(driver: Optional[str] = None, gp: Optional[str] = None, mood: Optional[str] = None) -> List[Clip]:
     """Filters clips by driver_code, gp, or human_label."""
-    clips = _load_data()
+    clips = get_all_clips()
     
     if driver:
         clips = [c for c in clips if c.driver_code.lower() == driver.lower()]

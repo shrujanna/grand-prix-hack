@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 # Load environment variables (from .env if it exists)
@@ -24,7 +25,10 @@ app.add_middleware(
 def health_check():
     return {"status": "ok", "message": "Backend is running successfully."}
 
-from app.routers import clips, analyze, laps
+from app.routers import clips, analyze, laps, openf1
+from app.services.live_clips import upload_directory
+app.mount("/media", StaticFiles(directory=upload_directory()), name="media")
 app.include_router(clips.router)
 app.include_router(analyze.router)
 app.include_router(laps.router)
+app.include_router(openf1.router)

@@ -7,9 +7,10 @@ import '../theme/index.css';
 interface ClipLibraryProps {
   onClipSelect: (clip: any) => void;
   selectedClipId?: string;
+  refreshKey?: string | null;
 }
 
-export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selectedClipId }) => {
+export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selectedClipId, refreshKey }) => {
   const [clips, setClips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +18,10 @@ export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selected
   // Filters
   const [driverFilter, setDriverFilter] = useState('');
   const [moodFilter, setMoodFilter] = useState('');
+  const [sessionFilter, setSessionFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [highStressOnly, setHighStressOnly] = useState(false);
+  const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
 
   useEffect(() => {
     const fetchClips = async () => {
@@ -35,11 +40,15 @@ export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selected
     };
 
     fetchClips();
-  }, []);
+  }, [refreshKey]);
 
   const filteredClips = clips.filter(clip => {
     if (driverFilter && clip.driver_code.toLowerCase() !== driverFilter.toLowerCase()) return false;
     if (moodFilter && clip.human_label?.toLowerCase() !== moodFilter.toLowerCase()) return false;
+    if (sessionFilter && clip.session.toLowerCase() !== sessionFilter.toLowerCase()) return false;
+    if (sourceFilter && (clip.source || 'archive') !== sourceFilter) return false;
+    if (highStressOnly && !['frustrated', 'dejected'].includes((clip.human_label || clip.audio_model_label || '').toLowerCase())) return false;
+    if (lowConfidenceOnly && !(typeof clip.audio_model_confidence === 'number' && clip.audio_model_confidence < 0.55)) return false;
     return true;
   });
 
@@ -50,7 +59,7 @@ export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selected
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1rem' }}>
       
       {/* Filter Header */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <input 
           type="text" 
           placeholder="Driver (e.g. HAM)" 
@@ -77,6 +86,22 @@ export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selected
           <option value="happy">Happy</option>
           <option value="neutral">Neutral</option>
         </select>
+        <input
+          type="text"
+          placeholder="Session (Race)"
+          value={sessionFilter}
+          onChange={(e) => setSessionFilter(e.target.value)}
+          style={{ background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)' }}
+        />
+        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ background: 'var(--bg-panel-solid)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)' }}>
+          <option value="">Archive + live</option>
+          <option value="live">Live uploads</option>
+          <option value="archive">Race archive</option>
+        </select>
+        <label style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', color: 'var(--text-secondary)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
+          <span><input type="checkbox" checked={highStressOnly} onChange={(event) => setHighStressOnly(event.target.checked)} /> HIGH STRESS</span>
+          <span><input type="checkbox" checked={lowConfidenceOnly} onChange={(event) => setLowConfidenceOnly(event.target.checked)} /> LOW CONFIDENCE</span>
+        </label>
       </div>
 
       {/* Scrollable List */}
@@ -116,6 +141,7 @@ export const ClipLibrary: React.FC<ClipLibraryProps> = ({ onClipSelect, selected
                     <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{clip.driver_code}</span>
                     <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>|</span>
                     <span style={{ color: 'var(--text-secondary)' }}>{clip.gp}</span>
+                    {clip.source === 'live' && <span style={{ color: 'var(--accent-f1)', marginLeft: '8px', fontSize: '0.7rem' }}>LIVE</span>}
                   </div>
                   {clip.human_label && (
                     <MoodBadge mood={clip.human_label} intensity={clip.human_label_intensity} size="sm" />

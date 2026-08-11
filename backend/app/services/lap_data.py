@@ -21,6 +21,14 @@ GP_MAPPING = {
 def _normalize_gp_name(gp: str) -> str:
     return GP_MAPPING.get(gp.lower().strip(), gp)
 
+
+def parse_openf1_datetime(value: str) -> Optional[datetime.datetime]:
+    """Parse OpenF1's ISO timestamp, including its trailing Z form."""
+    if not value:
+        return None
+    parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=datetime.timezone.utc)
+
 def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) -> List[Dict[str, Any]]:
     """
     Fetches all lap times for a specific driver in a session.
@@ -82,7 +90,11 @@ def map_timestamp_to_lap(year: int, gp: str, session_type: str, msg_datetime: da
         if not session_start:
             return None, True
             
-        session_start = pd.to_datetime(session_start).tz_localize('UTC')
+        session_start = pd.to_datetime(session_start)
+        if session_start.tzinfo is None:
+            session_start = session_start.tz_localize('UTC')
+        else:
+            session_start = session_start.tz_convert('UTC')
         if msg_datetime.tzinfo is None:
             msg_datetime = msg_datetime.replace(tzinfo=datetime.timezone.utc)
             

@@ -11,7 +11,8 @@ from starlette.datastructures import Headers, UploadFile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.routers.analyze import analyze_clip  # noqa: E402
+from app.routers.analyze import analyze_clip, analyze_openf1_radio  # noqa: E402
+from app.models.schemas import AnalyzeResponse  # noqa: E402
 from app.services.transcription import TranscriptionConfigurationError  # noqa: E402
 
 
@@ -40,7 +41,7 @@ class AnalyzeRouteTests(unittest.TestCase):
         ), patch(
             "app.routers.analyze.classify_text_sentiment", return_value={"label": "frustrated", "intensity": 4}
         ):
-            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None))
+            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None, save_clip=False))
 
         self.assertEqual(result.transcription_status, "completed")
         self.assertEqual(result.audio_analysis_status, "completed")
@@ -55,9 +56,24 @@ class AnalyzeRouteTests(unittest.TestCase):
             "app.routers.analyze.transcribe_audio",
             side_effect=TranscriptionConfigurationError("HF token is missing"),
         ):
-            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None))
+            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None, save_clip=False))
 
         self.assertEqual(result.transcription_status, "unavailable")
         self.assertEqual(result.audio_analysis_status, "unavailable")
         self.assertEqual(result.text_analysis_status, "skipped")
         self.assertIn("HF_TOKEN", result.transcription_error)
+
+    def test_openf1_analysis_keeps_resolved_season_and_lap_metadata(self):
+        response = AnalyzeResponse(audio_model_label="neutral", audio_model_confidence=0.7)
+        with patch(
+            "app.routers.analyze.radio_context",
+            return_value={"year": 2025, "gp": "Australian Grand Prix", "session": "Race", "driver_code": "HAM", "driver_name": "Lewis HAMILTON"},
+        ), patch(
+            "app.routers.analyze.download_team_radio",
+            return_value=(wav_bytes(), "audio/wav", "https://livetiming.formula1.com/radio.wav"),
+        ), patch("app.routers.analyze.analyze_audio_bytes", return_value=response) as analyze:
+            result = asyncio.run(analyze_openf1_radio(session_key=999, driver_number=44, date="2025-03-16T04:00:00+00:00", lap_number=12))
+
+        self.assertEqual(result.year, 2025)
+        self.assertEqual(analyze.call_args.kwargs["lap_number"], 12)
+        self.assertEqual(analyze.call_args.kwargs["driver_code"], "HAM")

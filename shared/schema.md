@@ -18,10 +18,14 @@ Represents a single labeled team radio message.
   "human_label": "string (enum: 'frustrated', 'neutral', 'happy', 'dejected') | null",
   "human_label_intensity": "integer (1-5) | null",
   "audio_model_label": "string | null",
+  "audio_model_confidence": "float | null",
   "text_model_label": "string | null",
   "lap_number": "float | null",
   "lap_is_ambiguous": "boolean | null",
-  "audio_url": "string"
+  "audio_url": "string",
+  "source": "'archive' | 'live'",
+  "uploaded_at": "ISO 8601 timestamp | null",
+  "audio_duration_seconds": "float | null"
 }
 ```
 

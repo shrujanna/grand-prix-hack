@@ -9,12 +9,16 @@ interface LapChartProps {
   gp: string;
   session: string;
   driver: string;
+  year?: number;
+  selectedClipId?: string;
+  selectedLapNumber?: number | null;
 }
 
-export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver }) => {
+export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 2026, selectedClipId, selectedLapNumber }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slowerLapsOnly, setSlowerLapsOnly] = useState(false);
 
   useEffect(() => {
     const fetchLaps = async () => {
@@ -22,11 +26,12 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver }) => {
       setError(null);
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-        const url = `${baseUrl}/api/laps?gp=${encodeURIComponent(gp)}&session=${encodeURIComponent(session)}&driver=${encodeURIComponent(driver)}`;
+        const url = `${baseUrl}/api/laps?gp=${encodeURIComponent(gp)}&session=${encodeURIComponent(session)}&driver=${encodeURIComponent(driver)}&year=${year}`;
         
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error('Failed to fetch lap data');
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.detail || 'FastF1 lap timing is unavailable for this selection.');
         }
         
         const result = await response.json();
@@ -39,7 +44,7 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver }) => {
     };
 
     fetchLaps();
-  }, [gp, session, driver]);
+  }, [gp, session, driver, year]);
 
   // CSS variables are tricky in recharts config, so we map them directly
   const getMoodColor = (mood?: string) => {
@@ -102,11 +107,24 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver }) => {
     return null;
   };
 
+  const dataWithSelectedRadio = selectedClipId && selectedLapNumber != null
+    ? data.map((lap) => Math.abs(lap.lap_number - selectedLapNumber) < 0.01
+      ? { ...lap, clip_id: selectedClipId, human_label: lap.human_label || 'neutral', is_ambiguous: false }
+      : lap)
+    : data;
+
+  const chartData = slowerLapsOnly
+    ? dataWithSelectedRadio.map((lap) => lap.delta_from_median && lap.delta_from_median > 0 ? lap : { ...lap, clip_id: null, human_label: null })
+    : dataWithSelectedRadio;
+
   return (
     <Card variant="glass" style={{ width: '100%', height: '400px', display: 'flex', flexDirection: 'column' }}>
-      <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-        Lap Time Telemetry & Emotion Overlay ({driver})
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>Lap Time Telemetry & Emotion Overlay ({driver})</h3>
+        <label style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={slowerLapsOnly} onChange={(event) => setSlowerLapsOnly(event.target.checked)} /> Slower laps only
+        </label>
+      </div>
       
       <div style={{ flex: 1, minHeight: 0 }}>
         {loading ? (
@@ -117,7 +135,7 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver }) => {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis 
                 dataKey="lap_number" 

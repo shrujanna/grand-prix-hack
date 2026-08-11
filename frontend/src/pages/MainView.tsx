@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { AudioUploader, type AnalysisResult } from '../components/AudioUploader';
-import { ClipLibrary } from '../components/ClipLibrary';
+import { OpenF1RadioArchive } from '../components/OpenF1RadioArchive';
 import { MoodDisplay } from '../components/MoodDisplay';
 import { LapChart } from '../components/LapChart';
+import { AudioPlayback } from '../components/AudioPlayback';
 import { Card } from '../components/ui/Card';
 import '../theme/index.css';
 
@@ -10,9 +11,8 @@ export const MainView: React.FC = () => {
   // State for the currently active data to display on the right
   const [activeData, setActiveData] = useState<any | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analyzingOpenF1, setAnalyzingOpenF1] = useState(false);
   
-  // Distinguish if the active data came from a live upload or the library
-  // Library data has FastF1 lap context; live uploads do not.
   const [isLiveUpload, setIsLiveUpload] = useState(false);
 
   const handleLibrarySelect = (clip: any) => {
@@ -26,15 +26,37 @@ export const MainView: React.FC = () => {
     setAnalysisError(null);
   };
 
+  const analyzeSelectedOpenF1Radio = async () => {
+    if (!activeData?.session_key || !activeData?.driver_number || !activeData?.date) return;
+    setAnalyzingOpenF1(true);
+    setAnalysisError(null);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const form = new FormData();
+      form.set('session_key', String(activeData.session_key));
+      form.set('driver_number', String(activeData.driver_number));
+      form.set('date', activeData.date);
+      if (activeData.lap_number != null) form.set('lap_number', String(activeData.lap_number));
+      const response = await fetch(`${baseUrl}/api/analyze/openf1`, { method: 'POST', body: form });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this team radio.');
+      setActiveData({ ...activeData, ...payload, year: activeData.year, source: 'openf1' });
+    } catch (error: any) {
+      setAnalysisError(error.message);
+    } finally {
+      setAnalyzingOpenF1(false);
+    }
+  };
+
   return (
     <div style={{ 
       display: 'flex', 
       flexDirection: 'column',
-      height: '100vh', 
+      minHeight: '100vh',
       padding: '2rem',
       maxWidth: '1600px',
       margin: '0 auto',
-      gap: '2rem'
+      gap: '1.25rem'
     }}>
       
       {/* Header */}
@@ -50,40 +72,33 @@ export const MainView: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '400px 1fr', 
-        gap: '2rem',
-        flex: 1,
-        minHeight: 0 // Allows children to scroll
-      }}>
+      <div className="telemetry-main-grid">
         
-        {/* Left Column: Inputs & Library */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minHeight: 0 }}>
-          <div style={{ flexShrink: 0 }}>
-            <AudioUploader onAnalysisComplete={handleLiveUpload} onError={setAnalysisError} />
-          </div>
+        {/* Radio discovery is the primary surface. Live input is available without squeezing it out. */}
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, gap: '0.85rem' }}>
+          <details style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-panel)', padding: '0.8rem 1rem' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+              LIVE TELEMETRY INPUT <span style={{ color: 'var(--text-muted)' }}>— upload or record a new radio</span>
+            </summary>
+            <div style={{ marginTop: '1rem' }}>
+              <AudioUploader onAnalysisComplete={handleLiveUpload} onError={setAnalysisError} />
+            </div>
+          </details>
           {analysisError && (
             <div role="alert" style={{ border: '1px solid var(--mood-frustrated)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.8rem', background: 'var(--mood-frustrated-glow)', fontSize: '0.875rem' }}>
               {analysisError}
             </div>
           )}
           
-          <Card variant="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '1rem' }}>
-            <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              RADIO ARCHIVE
-            </h2>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <ClipLibrary 
-                onClipSelect={handleLibrarySelect} 
-                selectedClipId={!isLiveUpload && activeData ? activeData.clip_id : undefined}
-              />
-            </div>
+          <Card variant="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 620, padding: '1rem' }}>
+            <OpenF1RadioArchive
+              onClipSelect={handleLibrarySelect}
+              selectedClipId={!isLiveUpload && activeData ? activeData.clip_id : undefined}
+            />
           </Card>
         </div>
 
-        {/* Right Column: Visualization */}
+        {/* Selected radio detail and matching FastF1 timing */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minHeight: 0 }}>
           {activeData ? (
             <>
@@ -99,21 +114,37 @@ export const MainView: React.FC = () => {
                   audioStatus={activeData.audio_analysis_status}
                   textStatus={activeData.text_analysis_status}
                 />
+                {activeData.audio_url && (
+                  <AudioPlayback audioUrl={activeData.audio_url} transcript={activeData.transcript || activeData.text} title="Selected team radio" />
+                )}
+                {activeData.source === 'openf1' && (
+                  <button
+                    type="button"
+                    onClick={analyzeSelectedOpenF1Radio}
+                    disabled={analyzingOpenF1}
+                    style={{ marginTop: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingOpenF1 ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingOpenF1 ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                  >
+                    {analyzingOpenF1 ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
+                  </button>
+                )}
               </div>
 
               {/* Bottom Right: Telemetry Chart */}
-              {!isLiveUpload && activeData.gp && activeData.session && activeData.driver_code ? (
+              {activeData.gp && activeData.session && activeData.driver_code && activeData.driver_code !== 'LIVE' && activeData.gp !== 'Live uploads' ? (
                 <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <LapChart 
                     gp={activeData.gp} 
                     session={activeData.session} 
                     driver={activeData.driver_code} 
+                    year={activeData.year}
+                    selectedClipId={activeData.clip_id}
+                    selectedLapNumber={activeData.lap_number}
                   />
                 </div>
               ) : (
                 <Card variant="glass" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
-                    LAP TELEMETRY UNAVAILABLE FOR LIVE UPLOADS.<br/>SELECT AN ARCHIVED CLIP TO VIEW FASTF1 DATA.
+                    ADD A DRIVER, GRAND PRIX, SESSION, AND LAP TO LINK THIS RADIO CLIP WITH TELEMETRY.
                   </p>
                 </Card>
               )}

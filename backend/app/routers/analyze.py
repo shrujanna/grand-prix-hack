@@ -7,12 +7,14 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.models.schemas import AnalyzeResponse
 from app.services.audio_emotion import classify_audio_emotion
 from app.services.audio_validation import AudioValidationError, validate_audio_upload
+from app.services.live_clips import save_live_clip
 from app.services.text_sentiment import classify_text_sentiment
 from app.services.transcription import (
     NoSpeechDetectedError,
     TranscriptionConfigurationError,
     transcribe_audio,
 )
+from app.services.openf1 import OpenF1Error, download_team_radio, radio_context
 
 
 router = APIRouter(prefix="/api/analyze", tags=["Analyze"])
@@ -57,16 +59,22 @@ def _service_error(service: str, error: Exception) -> tuple[str, str]:
     return "failed", "This analysis could not be completed. Please retry with a clear audio clip."
 
 
-@router.post("", response_model=AnalyzeResponse)
-async def analyze_clip(
-    audio: UploadFile = File(...),
-    transcript: Optional[str] = Form(None),
-    retry_services: Optional[str] = Form(None),
+async def analyze_audio_bytes(
+    audio_bytes: bytes,
+    content_type: Optional[str],
+    filename: Optional[str],
+    transcript: Optional[str] = None,
+    retry_services: Optional[str] = None,
+    driver_code: Optional[str] = None,
+    driver_name: Optional[str] = None,
+    gp: Optional[str] = None,
+    session: Optional[str] = None,
+    lap_number: Optional[float] = None,
+    save_clip: bool = True,
 ):
-    """Analyze an audio clip, with independent results for each AI service."""
-    audio_bytes = await audio.read()
+    """Run the shared analysis workflow for an uploaded or OpenF1 radio file."""
     try:
-        duration = validate_audio_upload(audio_bytes, audio.content_type, audio.filename)
+        duration = validate_audio_upload(audio_bytes, content_type, filename)
     except AudioValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -93,7 +101,7 @@ async def analyze_clip(
     if "audio" in requested:
         tasks["audio"] = asyncio.to_thread(classify_audio_emotion, audio_bytes)
     if "transcription" in requested and not transcript:
-        tasks["transcription"] = asyncio.to_thread(transcribe_audio, audio_bytes, audio.content_type)
+        tasks["transcription"] = asyncio.to_thread(transcribe_audio, audio_bytes, content_type)
 
     if tasks:
         task_names = list(tasks)
@@ -127,4 +135,87 @@ async def analyze_clip(
         response["text_analysis_status"] = "skipped"
         response["text_analysis_error"] = "Text sentiment needs a transcript first."
 
+    # Original live uploads are saved for future review. Service-only retries
+    # update the on-screen result without creating duplicate archive entries.
+    if save_clip and not retry_services:
+        metadata = {
+            "driver_code": (driver_code or "LIVE").strip().upper() or "LIVE",
+            "driver_name": (driver_name or driver_code or "Live upload").strip() or "Live upload",
+            "gp": (gp or "Live uploads").strip() or "Live uploads",
+            "session": (session or "Live").strip() or "Live",
+            "lap_number": lap_number,
+        }
+        try:
+            clip = await asyncio.to_thread(
+                save_live_clip,
+                audio_bytes=audio_bytes,
+                content_type=content_type,
+                filename=filename,
+                metadata=metadata,
+                analysis=response,
+            )
+            response.update(
+                clip_id=clip.clip_id,
+                gp=clip.gp,
+                session=clip.session,
+                driver_code=clip.driver_code,
+                driver_name=clip.driver_name,
+                lap_number=clip.lap_number,
+                audio_url=clip.audio_url,
+                source="live",
+                uploaded_at=clip.uploaded_at,
+            )
+        except Exception as error:
+            logger.exception("live_clip_save_failed error_type=%s", type(error).__name__)
+
     return AnalyzeResponse(**response)
+
+
+@router.post("", response_model=AnalyzeResponse)
+async def analyze_clip(
+    audio: UploadFile = File(...),
+    transcript: Optional[str] = Form(None),
+    retry_services: Optional[str] = Form(None),
+    driver_code: Optional[str] = Form(None),
+    driver_name: Optional[str] = Form(None),
+    gp: Optional[str] = Form(None),
+    session: Optional[str] = Form(None),
+    lap_number: Optional[float] = Form(None),
+    save_clip: bool = Form(True),
+):
+    """Analyze an audio clip uploaded by the operator."""
+    return await analyze_audio_bytes(
+        await audio.read(), audio.content_type, audio.filename, transcript, retry_services,
+        driver_code, driver_name, gp, session, lap_number, save_clip,
+    )
+
+
+@router.post("/openf1", response_model=AnalyzeResponse)
+async def analyze_openf1_radio(
+    session_key: int = Form(...),
+    driver_number: int = Form(...),
+    date: str = Form(...),
+    lap_number: Optional[float] = Form(None),
+):
+    """Analyze a public OpenF1 recording while preserving its race metadata."""
+    try:
+        context = await asyncio.to_thread(radio_context, session_key, driver_number, date)
+        audio_bytes, content_type, recording_url = await asyncio.to_thread(
+            download_team_radio, session_key, driver_number, date
+        )
+    except OpenF1Error as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+    result = await analyze_audio_bytes(
+        audio_bytes=audio_bytes,
+        content_type=content_type,
+        filename=recording_url.rsplit("/", 1)[-1] or "team-radio.mp3",
+        driver_code=context["driver_code"],
+        driver_name=context["driver_name"],
+        gp=context["gp"],
+        session=context["session"],
+        lap_number=lap_number,
+        save_clip=True,
+    )
+    result.year = context.get("year")
+    return result
