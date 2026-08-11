@@ -1,0 +1,28 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: f1_telemetry_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Pass through the Hugging Face API key required for the NLP models
+      - HF_API_KEY=${HF_API_KEY}
+    volumes:
+      # Optional: Mount the data directory to persist the FastF1 cache between container restarts
+      - ./backend/app/data:/app/app/data
+      - ./final_labeled_dataset.csv:/final_labeled_dataset.csv:ro
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: f1_telemetry_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      # Instruct the Vite build to point to the backend container
+      - VITE_API_BASE_URL=http://localhost:8000
