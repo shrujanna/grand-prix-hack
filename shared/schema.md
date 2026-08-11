@@ -34,9 +34,20 @@ Returned when `POST /api/analyze` is called with a new audio clip/transcript.
   "audio_model_label": "string",
   "audio_model_confidence": "float",
   "text_model_label": "string | null",
-  "text_model_intensity": "integer | null"
+  "text_model_intensity": "integer | null",
+  "transcription_status": "'completed' | 'provided' | 'no_speech' | 'unavailable' | 'failed' | 'skipped'",
+  "transcription_error": "string | null",
+  "audio_analysis_status": "'completed' | 'unavailable' | 'failed' | 'skipped'",
+  "audio_analysis_error": "string | null",
+  "text_analysis_status": "'completed' | 'unavailable' | 'failed' | 'skipped'",
+  "text_analysis_error": "string | null",
+  "audio_duration_seconds": "float | null"
 }
 ```
+
+The three services are intentionally independent. An unavailable provider therefore
+returns a successful analysis response with a per-service status and safe retry
+message, allowing the frontend to retry only that service.
 
 ## 3. LapPoint Object
 Represents a single lap's timing data, optionally decorated with mood data if a labeled clip occurred during this lap.

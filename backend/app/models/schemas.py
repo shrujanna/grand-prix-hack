@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, List
+from typing import Optional, List, Literal
 from enum import Enum
 
 class MoodLabel(str, Enum):
@@ -31,6 +31,13 @@ class AnalyzeResponse(BaseModel):
     audio_model_confidence: float
     text_model_label: Optional[str] = None
     text_model_intensity: Optional[int] = None
+    transcription_status: Literal["completed", "provided", "no_speech", "unavailable", "failed", "skipped"] = "skipped"
+    transcription_error: Optional[str] = None
+    audio_analysis_status: Literal["completed", "unavailable", "failed", "skipped"] = "skipped"
+    audio_analysis_error: Optional[str] = None
+    text_analysis_status: Literal["completed", "unavailable", "failed", "skipped"] = "skipped"
+    text_analysis_error: Optional[str] = None
+    audio_duration_seconds: Optional[float] = None
 
 class LapPoint(BaseModel):
     lap_number: float

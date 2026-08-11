@@ -7,8 +7,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Pass through the Hugging Face API key required for the NLP models
-      - HF_API_KEY=${HF_API_KEY}
+      # Docker Compose loads these from the repository-root .env file.
+      # HF_TOKEN is Hugging Face's current standard name; HF_API_KEY remains
+      # supported for existing deployments.
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_API_KEY: ${HF_API_KEY:-}
+      HF_ASR_MODEL_ID: ${HF_ASR_MODEL_ID:-openai/whisper-large-v3}
+      HF_ASR_TIMEOUT_SECONDS: ${HF_ASR_TIMEOUT_SECONDS:-60}
+      HF_ASR_MAX_RETRIES: ${HF_ASR_MAX_RETRIES:-2}
+      HF_INFERENCE_TIMEOUT_SECONDS: ${HF_INFERENCE_TIMEOUT_SECONDS:-30}
+      MAX_AUDIO_UPLOAD_BYTES: ${MAX_AUDIO_UPLOAD_BYTES:-20971520}
+      MAX_AUDIO_DURATION_SECONDS: ${MAX_AUDIO_DURATION_SECONDS:-120}
     volumes:
       # Optional: Mount the data directory to persist the FastF1 cache between container restarts
       - ./backend/app/data:/app/app/data

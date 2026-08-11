@@ -8,6 +8,9 @@ interface MoodDisplayProps {
   audioConfidence?: number | null;
   textLabel?: string | null;
   textIntensity?: number | null;
+  transcriptionStatus?: string | null;
+  audioStatus?: string | null;
+  textStatus?: string | null;
 }
 
 export const MoodDisplay: React.FC<MoodDisplayProps> = ({
@@ -15,7 +18,10 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
   audioLabel,
   audioConfidence,
   textLabel,
-  textIntensity
+  textIntensity,
+  transcriptionStatus,
+  audioStatus,
+  textStatus
 }) => {
   // Derive a rough 1-5 intensity for audio based on confidence (0-1) so it visually matches the text intensity badge
   const derivedAudioIntensity = audioConfidence 
@@ -50,6 +56,14 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
         </div>
 
         <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+
+        {(transcriptionStatus || audioStatus || textStatus) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {transcriptionStatus && <span>TEXT: {transcriptionStatus.replace('_', ' ').toUpperCase()}</span>}
+            {audioStatus && <span>VOICE: {audioStatus.replace('_', ' ').toUpperCase()}</span>}
+            {textStatus && <span>SENTIMENT: {textStatus.replace('_', ' ').toUpperCase()}</span>}
+          </div>
+        )}
 
         {/* Emotion Signals Section */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

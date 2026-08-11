@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AudioUploader } from '../components/AudioUploader';
+import { AudioUploader, type AnalysisResult } from '../components/AudioUploader';
 import { ClipLibrary } from '../components/ClipLibrary';
 import { MoodDisplay } from '../components/MoodDisplay';
 import { LapChart } from '../components/LapChart';
@@ -9,6 +9,7 @@ import '../theme/index.css';
 export const MainView: React.FC = () => {
   // State for the currently active data to display on the right
   const [activeData, setActiveData] = useState<any | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   
   // Distinguish if the active data came from a live upload or the library
   // Library data has FastF1 lap context; live uploads do not.
@@ -19,9 +20,10 @@ export const MainView: React.FC = () => {
     setActiveData(clip);
   };
 
-  const handleLiveUpload = (result: any) => {
+  const handleLiveUpload = (result: AnalysisResult) => {
     setIsLiveUpload(true);
     setActiveData(result);
+    setAnalysisError(null);
   };
 
   return (
@@ -60,11 +62,13 @@ export const MainView: React.FC = () => {
         {/* Left Column: Inputs & Library */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minHeight: 0 }}>
           <div style={{ flexShrink: 0 }}>
-            <AudioUploader 
-              onAnalysisComplete={handleLiveUpload} 
-              onError={(err) => alert(err)} 
-            />
+            <AudioUploader onAnalysisComplete={handleLiveUpload} onError={setAnalysisError} />
           </div>
+          {analysisError && (
+            <div role="alert" style={{ border: '1px solid var(--mood-frustrated)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', padding: '0.8rem', background: 'var(--mood-frustrated-glow)', fontSize: '0.875rem' }}>
+              {analysisError}
+            </div>
+          )}
           
           <Card variant="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '1rem' }}>
             <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
@@ -91,6 +95,9 @@ export const MainView: React.FC = () => {
                   audioConfidence={activeData.audio_model_confidence}
                   textLabel={activeData.text_model_label || activeData.human_label}
                   textIntensity={activeData.text_model_intensity || activeData.human_label_intensity}
+                  transcriptionStatus={activeData.transcription_status}
+                  audioStatus={activeData.audio_analysis_status}
+                  textStatus={activeData.text_analysis_status}
                 />
               </div>
 

@@ -1,1 +1,0 @@
-self.__next_f.push([1,"20:[\"$\",\"$L22\",null,{\"tool\":\"team_radio\"}]\n"])

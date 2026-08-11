@@ -1,10 +1,10 @@
 import os
+import time
 import requests
 from typing import Dict, Any
 
-HF_API_KEY = os.environ.get("HF_API_KEY")
-HF_AUDIO_MODEL_ID = os.environ.get("HF_AUDIO_MODEL_ID", "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
-HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_AUDIO_MODEL_ID}"
+DEFAULT_TIMEOUT_SECONDS = 30
+RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
 
 # Map wav2vec2 emotion labels to our standard 4 project labels
 EMOTION_MAPPING = {
@@ -24,15 +24,38 @@ def classify_audio_emotion(audio_bytes: bytes) -> Dict[str, Any]:
     """
     Sends audio bytes to Hugging Face Inference API and returns mapped emotion and confidence.
     """
-    if not HF_API_KEY:
-        raise ValueError("HF_API_KEY environment variable is not set.")
+    api_key = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
+    if not api_key:
+        raise ValueError("HF_API_KEY (or HF_TOKEN) environment variable is not set.")
 
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    
-    response = requests.post(HF_API_URL, headers=headers, data=audio_bytes)
+    model_id = os.environ.get(
+        "HF_AUDIO_MODEL_ID", "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"
+    )
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
+    try:
+        timeout = float(os.environ.get("HF_INFERENCE_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
+    except ValueError:
+        timeout = DEFAULT_TIMEOUT_SECONDS
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/octet-stream"}
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.post(api_url, headers=headers, data=audio_bytes, timeout=timeout)
+        except requests.RequestException as exc:
+            if attempt == 2:
+                raise RuntimeError("Audio-tone analysis provider could not be reached.") from exc
+            time.sleep(2**attempt)
+            continue
+        if response.status_code not in RETRYABLE_STATUS_CODES or attempt == 2:
+            break
+        time.sleep(2**attempt)
+
+    if response is None:
+        raise RuntimeError("Audio-tone analysis provider did not return a response.")
     
     if response.status_code != 200:
-        raise Exception(f"Hugging Face API error {response.status_code}: {response.text}")
+        raise RuntimeError(f"Hugging Face API error {response.status_code}")
 
     # Response is typically a list of dicts with 'label' and 'score'
     results = response.json()
