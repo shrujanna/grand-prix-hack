@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LoadingState } from './ui/LoadingState';
+import { formatTrackTime } from '../utils/timeUtils';
 
 type OpenF1Session = {
   session_key: number;
@@ -243,7 +244,9 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
           <p style={{ padding: '1.5rem 0.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>{local2026 ? 'No local recordings match these filters.' : 'No radio recordings for these filters.'}</p>
         ) : filteredRadios.map((radio) => {
           const selected = radio.clip_id === selectedClipId;
-          const time = radio.date ? new Date(radio.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+          const meeting = meetings.find(m => m.meeting_key === meetingKey);
+          const gpName = meeting?.meeting_name || meeting?.location || '';
+          const time = radio.date ? formatTrackTime(radio.date, gpName) : '—';
           return (
             <button
               key={radio.clip_id}

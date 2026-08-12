@@ -106,6 +106,11 @@ async def analyze_audio_bytes(
         "fatigue_confidence": 0.0,
         "fatigue_evidence": [],
         "fatigue_status": "skipped",
+        "lap_number": lap_number,
+        "gp": gp,
+        "session": session,
+        "driver_code": driver_code,
+        "driver_name": driver_name,
     }
 
     # The independent audio-tone and speech-to-text calls run concurrently.
@@ -129,7 +134,8 @@ async def analyze_audio_bytes(
                 response["audio_model_confidence"] = result["confidence"]
                 response["audio_analysis_status"] = "completed"
             else:
-                response["transcript"] = result
+                response["transcript"] = result[0]
+                response["chunks"] = result[1]
                 response["transcription_status"] = "completed"
 
     # Text sentiment can only start once an actual transcript is available.
@@ -267,3 +273,38 @@ async def analyze_local_archive_radio(clip_id: str = Form(...), lap_number: Opti
     result.clip_id, result.audio_url, result.source, result.year = context["clip_id"], context["audio_url"], "local", 2026
     result.gp, result.session, result.driver_code, result.driver_name = context["gp"], context["session"], context["driver_code"], context["driver_name"]
     return result
+
+from app.models.schemas import PerformanceAnalysisRequest, PerformanceAnalysisResponse
+
+@router.post("/performance", response_model=PerformanceAnalysisResponse)
+async def analyze_performance(request: PerformanceAnalysisRequest):
+    """Analyze the impact of driver mood on subsequent lap performance."""
+    if not request.lap_deltas:
+        return PerformanceAnalysisResponse(
+            summary="Not enough telemetry data was available after this radio clip to analyze performance impact.",
+            impact="neutral"
+        )
+        
+    avg_delta = sum(request.lap_deltas) / len(request.lap_deltas)
+    mood = request.mood.lower()
+    
+    impact = "neutral"
+    if avg_delta > 0.5:
+        impact = "negative"
+    elif avg_delta < -0.5:
+        impact = "positive"
+        
+    if impact == "negative":
+        if mood in ["frustrated", "dejected", "angry"]:
+            summary = f"The driver's {mood} tone strongly correlated with a loss of performance, dropping an average of {avg_delta:.1f}s off their pace in the following laps."
+        else:
+            summary = f"Despite sounding {mood}, the driver suffered a drop in performance, losing an average of {avg_delta:.1f}s in pace in the following laps."
+    elif impact == "positive":
+        if mood in ["frustrated", "dejected", "angry"]:
+            summary = f"Despite sounding {mood}, the driver channeled it into their driving, improving their pace by {abs(avg_delta):.1f}s on average in the following laps."
+        else:
+            summary = f"The driver's {mood} tone correlated with an improvement in performance, gaining an average of {abs(avg_delta):.1f}s in pace in the following laps."
+    else:
+        summary = f"The driver's {mood} tone did not significantly impact their immediate performance, with their pace remaining relatively stable (delta: {avg_delta:+.1f}s)."
+        
+    return PerformanceAnalysisResponse(summary=summary, impact=impact)

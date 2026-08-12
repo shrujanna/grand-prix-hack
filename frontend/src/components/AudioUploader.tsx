@@ -6,11 +6,12 @@ type ServiceName = 'transcription' | 'audio' | 'text';
 type ServiceStatus = 'completed' | 'provided' | 'estimated' | 'no_speech' | 'unavailable' | 'failed' | 'skipped';
 
 export interface AnalysisResult {
-  transcript?: string | null;
+  transcript: string | null;
+  chunks?: { text: string; timestamp: [number, number | null] }[] | null;
   audio_model_label: string;
   audio_model_confidence: number;
-  text_model_label?: string | null;
-  text_model_intensity?: number | null;
+  text_model_label: string | null;
+  text_model_intensity: number | null;
   transcription_status: ServiceStatus;
   transcription_error?: string | null;
   audio_analysis_status: ServiceStatus;

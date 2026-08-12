@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from enum import Enum
 
 class MoodLabel(str, Enum):
@@ -39,6 +39,7 @@ class Clip(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     transcript: Optional[str] = None
+    chunks: Optional[List[Dict[str, Any]]] = None
     audio_model_label: str
     audio_model_confidence: float
     text_model_label: Optional[str] = None
@@ -154,3 +155,11 @@ class LapChartResponse(BaseModel):
     driver_code: str
     laps: List[LapPoint]
     performance: PerformanceSummary
+
+class PerformanceAnalysisRequest(BaseModel):
+    mood: str
+    lap_deltas: List[float]
+
+class PerformanceAnalysisResponse(BaseModel):
+    summary: str
+    impact: str

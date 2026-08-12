@@ -14,12 +14,18 @@ class TrackPoint(BaseModel):
     x: float
     y: float
 
+class CornerMarker(BaseModel):
+    x: float
+    y: float
+    number: str
+
 class TrackMapResponse(BaseModel):
     gp: str
     session: str
     driver: str
     year: int
     track_path: List[TrackPoint]
+    corners: Optional[List[CornerMarker]] = None
 
 @router.get("/track-map", response_model=TrackMapResponse)
 def get_track_map(
@@ -60,12 +66,22 @@ def get_track_map(
         if not points:
             raise HTTPException(status_code=404, detail="No telemetry available to draw track.")
             
+        corners_list = []
+        try:
+            circuit_info = sess.get_circuit_info()
+            for _, c in circuit_info.corners.iterrows():
+                if not pd.isna(c['X']) and not pd.isna(c['Y']):
+                    corners_list.append(CornerMarker(x=float(c['X']), y=float(c['Y']), number=str(c['Number'])))
+        except Exception as e:
+            print(f"Failed to fetch corners: {e}")
+            
         return TrackMapResponse(
             gp=gp,
             session=session,
             driver=driver,
             year=year,
-            track_path=points
+            track_path=points,
+            corners=corners_list
         )
     except Exception as e:
         print(f"Error fetching track map: {e}")

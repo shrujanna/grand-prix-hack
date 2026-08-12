@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from './ui/Card';
+import { formatTrackTime } from '../utils/timeUtils';
 
 interface PriorityQueueProps {
   onClipSelect: (clip: any) => void;
@@ -66,6 +67,7 @@ export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refr
             <div key={clip.clip_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.5rem', alignItems: 'center', borderLeft: `3px solid ${done ? 'var(--text-muted)' : clip.fatigue_label === 'high' ? 'var(--mood-frustrated)' : '#f5a623'}`, padding: '0.32rem 0 0.32rem 0.5rem' }}>
               <button type="button" onClick={() => onClipSelect(clip)} style={{ border: 0, background: 'transparent', color: 'var(--text-primary)', textAlign: 'left', cursor: 'pointer', padding: 0 }}>
                 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{done ? '✓ REVIEWED' : '⚑ REVIEW'} · {clip.driver_code} · {label}</strong>
+                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '0.12rem' }}>{formatTrackTime(clip.date, clip.gp)} · L{clip.lap_number || '?'}</span>
                 <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '0.12rem', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{clip.text || 'Transcript pending'}</span>
               </button>
               <button type="button" onClick={() => acknowledge(clip.clip_id)} disabled={done} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: done ? 'var(--text-muted)' : 'var(--text-primary)', padding: '0.3rem 0.45rem', cursor: done ? 'default' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.62rem' }}>{done ? 'ACKNOWLEDGED' : 'ACKNOWLEDGE'}</button>

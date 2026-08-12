@@ -4,6 +4,8 @@ import { MoodBadge } from './ui/MoodBadge';
 
 interface MoodDisplayProps {
   transcript: string | null;
+  chunks?: { text: string; timestamp: [number, number | null] }[] | null;
+  playbackTime?: number | null;
   audioLabel: string;
   audioConfidence?: number | null;
   textLabel?: string | null;
@@ -23,6 +25,8 @@ interface MoodDisplayProps {
 
 export const MoodDisplay: React.FC<MoodDisplayProps> = ({
   transcript,
+  chunks,
+  playbackTime,
   audioLabel,
   audioConfidence,
   textLabel,
@@ -43,6 +47,32 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
   const derivedAudioIntensity = audioConfidence 
     ? Math.max(1, Math.min(5, Math.round(audioConfidence * 5))) 
     : undefined;
+
+  const renderTranscript = () => {
+    if (!transcript) return "No transcript available.";
+    if (!chunks || !chunks.length) return transcript;
+
+    return chunks.map((chunk, index) => {
+      const start = chunk.timestamp[0];
+      const end = chunk.timestamp[1] ?? (index === chunks.length - 1 ? 999 : chunks[index + 1].timestamp[0]);
+      
+      const isActive = playbackTime !== null && playbackTime !== undefined && playbackTime >= start && playbackTime <= end;
+      const isPast = playbackTime !== null && playbackTime !== undefined && playbackTime > end;
+      
+      return (
+        <span 
+          key={index} 
+          style={{ 
+            color: isActive ? 'var(--text-primary)' : isPast ? 'var(--text-secondary)' : 'var(--text-muted)',
+            transition: 'color 0.1s ease',
+            textShadow: isActive ? '0 0 8px rgba(255,255,255,0.2)' : 'none'
+          }}
+        >
+          {chunk.text}
+        </span>
+      );
+    });
+  };
 
   return (
     <Card variant="solid" style={{ width: '100%' }}>
@@ -67,7 +97,7 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
             fontStyle: transcript?.includes('REQUIRED') ? 'italic' : 'normal',
             opacity: transcript?.includes('REQUIRED') ? 0.7 : 1
           }}>
-            {transcript || "No transcript available."}
+            {renderTranscript()}
           </p>
         </div>
 

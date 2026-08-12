@@ -13,6 +13,7 @@ interface LapChartProps {
   selectedMoodLabel?: string | null;
   lapTimes?: number[];
   onSelectedLapInsight?: (lap: any | null) => void;
+  showAiInsight?: boolean;
 }
 
 const toLapPoints = (lapTimes: number[]) => {
@@ -26,10 +27,13 @@ const toLapPoints = (lapTimes: number[]) => {
   }));
 };
 
-export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 2026, selectedClipId, selectedLapNumber, selectedMoodLabel, lapTimes, onSelectedLapInsight }) => {
+export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 2026, selectedClipId, selectedLapNumber, selectedMoodLabel, lapTimes, onSelectedLapInsight, showAiInsight = false }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [aiInsight, setAiInsight] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     const fetchLaps = async () => {
@@ -68,6 +72,53 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
     const selected = selectedLapNumber == null ? null : data.find((lap) => Math.abs(lap.lap_number - selectedLapNumber) < 0.01) || null;
     onSelectedLapInsight(selected);
   }, [data, onSelectedLapInsight, selectedLapNumber]);
+
+  useEffect(() => {
+    if (selectedLapNumber == null || !data.length || !showAiInsight) {
+      setAiInsight(null);
+      return;
+    }
+
+    const lapIndex = data.findIndex(l => Math.abs(l.lap_number - selectedLapNumber) < 0.01);
+    if (lapIndex === -1 || lapIndex >= data.length - 1) {
+      setAiInsight(null);
+      return;
+    }
+
+    const nextLaps = data.slice(lapIndex + 1, lapIndex + 4);
+    const lapDeltas = nextLaps.map(l => l.delta_from_median).filter(d => typeof d === 'number');
+
+    if (lapDeltas.length === 0) {
+      setAiInsight(null);
+      return;
+    }
+
+    const fetchAiInsight = async () => {
+      setAiLoading(true);
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+        const response = await fetch(`${baseUrl}/api/analyze/performance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mood: selectedMoodLabel || 'neutral',
+            lap_deltas: lapDeltas
+          })
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setAiInsight(result);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    fetchAiInsight();
+  }, [selectedLapNumber, data, selectedMoodLabel, showAiInsight]);
+
 
   // CSS variables are tricky in recharts config, so we map them directly
   const getMoodColor = (mood?: string) => {
@@ -208,6 +259,37 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* AI Analysis Box */}
+      {selectedLapNumber != null && showAiInsight && (
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border-subtle)',
+          background: 'rgba(0,0,0,0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem'
+        }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+             <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>AI PERFORMANCE INSIGHT</span>
+           </div>
+           {aiLoading ? (
+             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Analyzing post-radio lap telemetry...</span>
+           ) : aiInsight ? (
+             <p style={{ 
+               fontSize: '0.85rem', 
+               lineHeight: 1.4, 
+               color: aiInsight.impact === 'negative' ? '#f5a623' : aiInsight.impact === 'positive' ? '#2ed573' : '#a4b0be'
+             }}>
+               {aiInsight.summary}
+             </p>
+           ) : (
+             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Insufficient data to analyze post-radio performance impact.</span>
+           )}
+        </div>
+      )}
     </Card>
   );
 };

@@ -7,6 +7,7 @@ import { TrackMap } from '../components/TrackMap';
 import { AudioPlayback } from '../components/AudioPlayback';
 import { PriorityQueue } from '../components/PriorityQueue';
 import { Card } from '../components/ui/Card';
+import { formatTrackTime } from '../utils/timeUtils';
 import '../theme/index.css';
 
 export const MainView: React.FC = () => {
@@ -15,13 +16,17 @@ export const MainView: React.FC = () => {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzingArchiveRadio, setAnalyzingArchiveRadio] = useState(false);
   
+  const [showAiInsight, setShowAiInsight] = useState(false);
   const [isLiveUpload, setIsLiveUpload] = useState(false);
   const [selectedLapInsight, setSelectedLapInsight] = useState<any | null>(null);
   const [latestRadio, setLatestRadio] = useState<any | null>(null);
+  const [playbackTime, setPlaybackTime] = useState<number | null>(null);
 
   const handleLibrarySelect = (clip: any) => {
     setIsLiveUpload(false);
     setActiveData(clip);
+    setShowAiInsight(false);
+    setPlaybackTime(null);
   };
 
   const handleSelectedLapInsight = useCallback((lap: any | null) => {
@@ -37,6 +42,8 @@ export const MainView: React.FC = () => {
     setActiveData(result);
     setAnalysisError(null);
     setLatestRadio(result);
+    setShowAiInsight(true);
+    setPlaybackTime(null);
   };
 
   const handleLiveTelemetryChange = (telemetry: { lapTimes: number[]; lapNumber: number | null }) => {
@@ -76,6 +83,7 @@ export const MainView: React.FC = () => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this team radio.');
       setActiveData({ ...activeData, ...payload, year: activeData.year, source: isLocal ? 'local' : 'openf1' });
+      setShowAiInsight(true);
     } catch (error: any) {
       setAnalysisError(error.message);
     } finally {
@@ -97,9 +105,11 @@ export const MainView: React.FC = () => {
       {/* Header */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             <span style={{ color: 'var(--accent-f1)', marginRight: '12px' }}>|</span>
-            PIT WALL TELEMETRY
+            <span className="live-gradient-text">
+              Radio Talk
+            </span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', marginTop: '4px' }}>
             AUDIO VIBRATION & NLP SENTIMENT ANALYSIS
@@ -138,7 +148,10 @@ export const MainView: React.FC = () => {
         </Card>
       )}
 
-      <div className="telemetry-main-grid">
+      <div 
+        className="telemetry-main-grid"
+        style={!activeData ? { gridTemplateColumns: 'minmax(400px, 1fr) minmax(400px, 1fr)' } : undefined}
+      >
         
         {/* Radio discovery is the primary surface. Live input is available without squeezing it out. */}
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, gap: '0.85rem' }}>
@@ -179,7 +192,7 @@ export const MainView: React.FC = () => {
           </details>
           {latestRadio && !activeData && (
             <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontFamily: 'var(--font-mono)', padding: '0 0.2rem' }}>
-              LATEST ARCHIVE RADIO · {latestRadio.driver_code} · {new Date(latestRadio.date).toLocaleTimeString()}
+              LATEST ARCHIVE RADIO · {latestRadio.driver_code} · {latestRadio.date ? formatTrackTime(latestRadio.date, latestRadio.gp) : '—'}
             </p>
           )}
         </div>
@@ -192,6 +205,8 @@ export const MainView: React.FC = () => {
               <div style={{ flexShrink: 0 }}>
                 <MoodDisplay 
                   transcript={activeData.transcript || activeData.text}
+                  chunks={activeData.chunks}
+                  playbackTime={playbackTime}
                   audioLabel={activeData.audio_model_label || activeData.human_label}
                   audioConfidence={activeData.audio_model_confidence}
                   textLabel={activeData.text_model_label || activeData.human_label}
@@ -209,7 +224,7 @@ export const MainView: React.FC = () => {
                   fatigueStatus={activeData.fatigue_status}
                 />
                 {activeData.audio_url && (
-                  <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" />
+                  <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" onTimeUpdate={setPlaybackTime} />
                 )}
                 {['openf1', 'local'].includes(activeData.source) && (
                   <button
@@ -237,6 +252,7 @@ export const MainView: React.FC = () => {
                       selectedMoodLabel={activeData.mood_label || activeData.human_label}
                       lapTimes={activeData.lap_times}
                       onSelectedLapInsight={handleSelectedLapInsight}
+                      showAiInsight={showAiInsight}
                     />
                   </div>
                   {/* Track map is only available for FastF1 archive sessions, not manual live uploads with just lap times */}

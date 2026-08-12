@@ -93,10 +93,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .telemetry-main-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(460px, 1.1fr);
+  grid-template-columns: 440px 1fr;
   gap: 1.25rem;
   flex: 1;
   min-height: 0;
+}
+
+@keyframes liveGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.live-gradient-text {
+  background: linear-gradient(90deg, #ff1801, #ff8c00, #ff1801);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  animation: liveGradient 4s ease infinite;
 }
 
 @media (max-width: 900px) {

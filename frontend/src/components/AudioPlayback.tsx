@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 interface AudioPlaybackProps {
   audioUrl: string;
   title?: string;
+  onTimeUpdate?: (time: number) => void;
 }
 
 const apiAudioUrl = (audioUrl: string) => {
@@ -12,7 +13,7 @@ const apiAudioUrl = (audioUrl: string) => {
   return `${baseUrl}${audioUrl.startsWith('/') ? audioUrl : `/${audioUrl}`}`;
 };
 
-export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, title = 'Radio playback' }) => {
+export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, title = 'Radio playback', onTimeUpdate }) => {
   const playerRef = useRef<HTMLAudioElement>(null);
   const [speed, setSpeed] = useState(1);
 
@@ -37,6 +38,7 @@ export const AudioPlayback: React.FC<AudioPlaybackProps> = ({ audioUrl, title = 
         controls
         preload="metadata"
         src={apiAudioUrl(audioUrl)}
+        onTimeUpdate={(e) => onTimeUpdate?.((e.target as HTMLAudioElement).currentTime)}
         style={{ width: '100%', height: '40px', outline: 'none' }}
       />
     </section>

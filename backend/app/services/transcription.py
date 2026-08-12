@@ -1,6 +1,7 @@
 import os
 import time
-from typing import Any, Optional
+import base64
+from typing import Any, Optional, Tuple, List, Dict
 
 import requests
 
@@ -47,10 +48,10 @@ def _retry_delay(response: Any, attempt: int) -> float:
         return min(2**attempt, 4.0)
 
 
-def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> Optional[str]:
+def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> Tuple[Optional[str], List[Dict[str, Any]]]:
     """
     Sends audio bytes to Hugging Face Inference API for Automatic Speech Recognition (ASR).
-    Returns the transcribed text string.
+    Returns a tuple of (transcribed text, chunks array with timestamps).
     """
     if not audio_bytes:
         raise ValueError("The uploaded audio file is empty.")
@@ -79,10 +80,12 @@ def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> 
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        # Whisper accepts the uploaded audio bytes directly. Preserve the
-        # browser's audio MIME type when available so the provider can decode
-        # formats such as MP3 reliably.
-        "Content-Type": content_type if content_type and content_type.startswith("audio/") else "application/octet-stream",
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "inputs": base64.b64encode(audio_bytes).decode("utf-8"),
+        "parameters": {"return_timestamps": "word"}
     }
 
     response = None
@@ -91,7 +94,7 @@ def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> 
             response = requests.post(
                 api_url,
                 headers=headers,
-                data=audio_bytes,
+                json=payload,
                 timeout=timeout,
             )
         except requests.RequestException as exc:
@@ -118,8 +121,9 @@ def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> 
 
     if isinstance(result, dict):
         text = result.get("text") or result.get("generated_text")
+        chunks = result.get("chunks", [])
         if isinstance(text, str) and text.strip():
-            return text.strip()
+            return text.strip(), chunks
         if result.get("error"):
             raise RuntimeError(f"Hugging Face ASR API error: {result['error']}")
     elif isinstance(result, list) and result:
@@ -127,7 +131,8 @@ def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> 
         first = result[0]
         if isinstance(first, dict):
             text = first.get("text") or first.get("generated_text")
+            chunks = first.get("chunks", [])
             if isinstance(text, str) and text.strip():
-                return text.strip()
+                return text.strip(), chunks
 
     raise NoSpeechDetectedError("No intelligible speech was detected in the uploaded audio.")
