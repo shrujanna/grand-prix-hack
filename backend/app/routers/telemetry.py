@@ -136,7 +136,9 @@ def get_clip_location(clip_id: str = Query(...)):
         time_offset = msg_time - session_start
         
         # Find telemetry at this time offset
-        tel = sess.telemetry.pick_driver(clip["code"])
+        driver_info = sess.get_driver(clip["code"])
+        driver_num = str(driver_info["DriverNumber"])
+        tel = sess.pos_data[driver_num]
         closest = tel.iloc[(tel['Time'] - time_offset).abs().argsort()[:1]]
         
         if closest.empty or pd.isna(closest.iloc[0]['X']):
