@@ -1,0 +1,3 @@
+# Local service credentials
+/.env
+/backend/.env
