@@ -24,6 +24,9 @@ def process_dataset(input_path, output_path):
     
     df['lap_number'] = None
     df['lap_is_ambiguous'] = False
+    df['current_lap_time'] = None
+    df['prev_lap_time'] = None
+    df['next_lap_time'] = None
     
     # group by GP and Session
     for (gp, session_name), group in df.groupby(['Grand Prix', 'Session']):
@@ -91,8 +94,25 @@ def process_dataset(input_path, output_path):
                 # find closest lap
                 laps['time_diff'] = (laps['LapStartTime'] - msg_rel_time).abs()
                 closest_lap = laps.sort_values('time_diff').iloc[0]
-                df.at[idx, 'lap_number'] = closest_lap['LapNumber']
+                lap_num = closest_lap['LapNumber']
+                df.at[idx, 'lap_number'] = lap_num
                 df.at[idx, 'lap_is_ambiguous'] = True
+                
+            # Extract lap times for current, previous, and next laps to help analyze correlation
+            try:
+                curr_lap = laps[laps['LapNumber'] == lap_num]
+                if not curr_lap.empty and pd.notna(curr_lap.iloc[0]['LapTime']):
+                    df.at[idx, 'current_lap_time'] = curr_lap.iloc[0]['LapTime'].total_seconds()
+                
+                prev_lap = laps[laps['LapNumber'] == lap_num - 1]
+                if not prev_lap.empty and pd.notna(prev_lap.iloc[0]['LapTime']):
+                    df.at[idx, 'prev_lap_time'] = prev_lap.iloc[0]['LapTime'].total_seconds()
+                    
+                next_lap = laps[laps['LapNumber'] == lap_num + 1]
+                if not next_lap.empty and pd.notna(next_lap.iloc[0]['LapTime']):
+                    df.at[idx, 'next_lap_time'] = next_lap.iloc[0]['LapTime'].total_seconds()
+            except Exception as e:
+                pass
                 
     # Renaming and reordering
     # clip_id, gp, session, driver_code, driver_name, speaker, text, is_audio_only, human_label, human_label_intensity, audio_model_label, text_model_label, lap_number, lap_is_ambiguous, audio_url
@@ -109,7 +129,12 @@ def process_dataset(input_path, output_path):
     df['audio_model_label'] = None
     df['text_model_label'] = None
     
-    final_cols = ['clip_id', 'gp', 'session', 'driver_code', 'driver_name', 'speaker', 'text', 'is_audio_only', 'human_label', 'human_label_intensity', 'audio_model_label', 'text_model_label', 'lap_number', 'lap_is_ambiguous', 'audio_url']
+    final_cols = [
+        'clip_id', 'gp', 'session', 'driver_code', 'driver_name', 'speaker', 'text', 
+        'is_audio_only', 'human_label', 'human_label_intensity', 'audio_model_label', 
+        'text_model_label', 'lap_number', 'lap_is_ambiguous', 'current_lap_time', 
+        'prev_lap_time', 'next_lap_time', 'audio_url'
+    ]
     final_df = df[final_cols]
     final_df.to_csv(output_path, index=False)
     print(f"Saved to {output_path}")
