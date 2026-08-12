@@ -12,7 +12,7 @@ export const MainView: React.FC = () => {
   // State for the currently active data to display on the right
   const [activeData, setActiveData] = useState<any | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analyzingOpenF1, setAnalyzingOpenF1] = useState(false);
+  const [analyzingArchiveRadio, setAnalyzingArchiveRadio] = useState(false);
   
   const [isLiveUpload, setIsLiveUpload] = useState(false);
   const [selectedLapInsight, setSelectedLapInsight] = useState<any | null>(null);
@@ -56,25 +56,29 @@ export const MainView: React.FC = () => {
         ? 'The radio tone or words indicate a concerning mood signal. It is a prompt to review, not a diagnosis.'
         : 'No concerning mood or fatigue cue is currently associated with this radio.';
 
-  const analyzeSelectedOpenF1Radio = async () => {
-    if (!activeData?.session_key || !activeData?.driver_number || !activeData?.date) return;
-    setAnalyzingOpenF1(true);
+  const analyzeSelectedArchiveRadio = async () => {
+    const isLocal = activeData?.source === 'local';
+    if (!activeData?.date || (isLocal ? !activeData?.clip_id : (!activeData?.session_key || !activeData?.driver_number))) return;
+    setAnalyzingArchiveRadio(true);
     setAnalysisError(null);
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
       const form = new FormData();
-      form.set('session_key', String(activeData.session_key));
-      form.set('driver_number', String(activeData.driver_number));
-      form.set('date', activeData.date);
+      if (isLocal) form.set('clip_id', activeData.clip_id);
+      else {
+        form.set('session_key', String(activeData.session_key));
+        form.set('driver_number', String(activeData.driver_number));
+        form.set('date', activeData.date);
+      }
       if (activeData.lap_number != null) form.set('lap_number', String(activeData.lap_number));
-      const response = await fetch(`${baseUrl}/api/analyze/openf1`, { method: 'POST', body: form });
+      const response = await fetch(`${baseUrl}${isLocal ? '/api/analyze/local-archive' : '/api/analyze/openf1'}`, { method: 'POST', body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this team radio.');
-      setActiveData({ ...activeData, ...payload, year: activeData.year, source: 'openf1' });
+      setActiveData({ ...activeData, ...payload, year: activeData.year, source: isLocal ? 'local' : 'openf1' });
     } catch (error: any) {
       setAnalysisError(error.message);
     } finally {
-      setAnalyzingOpenF1(false);
+      setAnalyzingArchiveRadio(false);
     }
   };
 
@@ -153,7 +157,7 @@ export const MainView: React.FC = () => {
           
           <details style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-panel)', padding: '0.8rem 1rem' }}>
             <summary style={{ cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
-              RADIO ARCHIVE <span style={{ color: 'var(--text-muted)' }}>— OpenF1 recordings and FastF1 lap context</span>
+              RADIO ARCHIVE <span style={{ color: 'var(--text-muted)' }}>— local 2026 audio / OpenF1 recordings and FastF1 lap context</span>
             </summary>
             <div style={{ marginTop: '0.85rem' }}>
               <OpenF1RadioArchive
@@ -206,14 +210,14 @@ export const MainView: React.FC = () => {
                 {activeData.audio_url && (
                   <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" />
                 )}
-                {activeData.source === 'openf1' && (
+                {['openf1', 'local'].includes(activeData.source) && (
                   <button
                     type="button"
-                    onClick={analyzeSelectedOpenF1Radio}
-                    disabled={analyzingOpenF1}
-                    style={{ marginTop: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingOpenF1 ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingOpenF1 ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                    onClick={analyzeSelectedArchiveRadio}
+                    disabled={analyzingArchiveRadio}
+                    style={{ marginTop: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
                   >
-                    {analyzingOpenF1 ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
+                    {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
                   </button>
                 )}
               </div>
@@ -228,8 +232,8 @@ export const MainView: React.FC = () => {
                     year={activeData.year}
                     selectedClipId={activeData.clip_id}
                     selectedLapNumber={activeData.lap_number}
+                    selectedMoodLabel={activeData.mood_label || activeData.human_label}
                     lapTimes={activeData.lap_times}
-                    onClipSelect={handleLibrarySelect}
                     onSelectedLapInsight={handleSelectedLapInsight}
                   />
                 </div>

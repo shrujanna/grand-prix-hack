@@ -27,7 +27,7 @@ type OpenF1Radio = {
   driver_name: string;
   team_name?: string;
   audio_url: string;
-  source: 'openf1';
+  source: 'openf1' | 'local';
 };
 
 interface OpenF1RadioArchiveProps {
@@ -51,7 +51,7 @@ const selectStyle: React.CSSProperties = {
 
 export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSelect, onLatestRadio, selectedClipId, compact = false }) => {
   const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState(Math.min(currentYear, 2025));
+  const [year, setYear] = useState(currentYear);
   const [sessions, setSessions] = useState<OpenF1Session[]>([]);
   const [drivers, setDrivers] = useState<OpenF1Driver[]>([]);
   const [radios, setRadios] = useState<OpenF1Radio[]>([]);
@@ -69,6 +69,9 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
     setError(null);
     setRefreshTick((current) => current + 1);
   };
+  const local2026 = year === 2026;
+  const archiveApi = local2026 ? '/api/local-archive' : '/api/openf1';
+  const archiveSource = local2026 ? 'LOCAL 2026 AUDIO' : 'OPENF1 RADIO';
 
   const meetings = useMemo(() => {
     const byKey = new Map<number, OpenF1Session>();
@@ -101,7 +104,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
     setMeetingKey(null);
     setSessionKey(null);
     setDriverNumber(null);
-    fetch(`${apiBaseUrl()}/api/openf1/sessions?year=${year}`)
+    fetch(`${apiBaseUrl()}${archiveApi}/sessions?year=${year}`)
       .then(async (response) => {
         if (!response.ok) throw new Error((await response.json()).detail || 'Unable to load OpenF1 sessions.');
         return response.json();
@@ -118,7 +121,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
       .catch((requestError: Error) => !cancelled && setError(requestError.message))
       .finally(() => !cancelled && setLoadingSessions(false));
     return () => { cancelled = true; };
-  }, [year]);
+  }, [year, archiveApi]);
 
   useEffect(() => {
     if (!meetingKey) return;
@@ -133,7 +136,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
     let cancelled = false;
     setDrivers([]);
     setDriverNumber(null);
-    fetch(`${apiBaseUrl()}/api/openf1/drivers?session_key=${sessionKey}`)
+    fetch(`${apiBaseUrl()}${archiveApi}/drivers?session_key=${sessionKey}`)
       .then(async (response) => {
         if (!response.ok) throw new Error((await response.json()).detail || 'Unable to load drivers.');
         return response.json();
@@ -141,7 +144,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
       .then((nextDrivers: OpenF1Driver[]) => !cancelled && setDrivers(nextDrivers))
       .catch((requestError: Error) => !cancelled && setError(requestError.message));
     return () => { cancelled = true; };
-  }, [sessionKey]);
+  }, [sessionKey, archiveApi]);
 
   useEffect(() => {
     if (!sessionKey) return;
@@ -149,7 +152,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
     setLoadingRadios(true);
     setError(null);
     const query = driverNumber ? `&driver_number=${driverNumber}` : '';
-    fetch(`${apiBaseUrl()}/api/openf1/radio?session_key=${sessionKey}${query}`)
+    fetch(`${apiBaseUrl()}${archiveApi}/radio?session_key=${sessionKey}${query}`)
       .then(async (response) => {
         if (!response.ok) throw new Error((await response.json()).detail || 'Unable to load team radio.');
         return response.json();
@@ -162,7 +165,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
       .catch((requestError: Error) => !cancelled && setError(requestError.message))
       .finally(() => !cancelled && setLoadingRadios(false));
     return () => { cancelled = true; };
-  }, [sessionKey, driverNumber, refreshTick, year, onLatestRadio]);
+  }, [sessionKey, driverNumber, refreshTick, year, onLatestRadio, archiveApi]);
 
   useEffect(() => {
     if (!sessionKey) return;
@@ -176,12 +179,11 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
     setResolvingClipId(radio.clip_id);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        session_key: String(radio.session_key),
-        driver_number: String(radio.driver_number),
-        date: radio.date,
+      const params = radio.source === 'local' ? new URLSearchParams({ clip_id: radio.clip_id }) : new URLSearchParams({
+        session_key: String(radio.session_key), driver_number: String(radio.driver_number), date: radio.date,
       });
-      const response = await fetch(`${apiBaseUrl()}/api/openf1/radio-context?${params}`);
+      const contextApi = radio.source === 'local' ? '/api/local-archive/radio-context' : '/api/openf1/radio-context';
+      const response = await fetch(`${apiBaseUrl()}${contextApi}?${params}`);
       if (!response.ok) throw new Error((await response.json()).detail || 'Unable to match this radio to telemetry.');
       const context = await response.json();
       onClipSelect({ ...radio, ...context, text: null, transcript: null, is_audio_only: true });
@@ -199,7 +201,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
         {!compact && <div>
           <h2 style={{ fontSize: '1rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>RADIO ARCHIVE</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', marginTop: '0.2rem' }}>OPENF1 RADIO • FASTF1 LAP CONTEXT</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', marginTop: '0.2rem' }}>{archiveSource} • FASTF1 LAP CONTEXT</p>
         </div>}
         <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>{filteredRadios.length} SIGNALS</span>
       </div>
@@ -237,8 +239,8 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
       )}
 
       <div style={{ height: compact ? 236 : undefined, flex: compact ? '0 0 auto' : 1, minHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingRight: '0.25rem' }}>
-        {loadingSessions || loadingRadios ? <LoadingState message={loadingSessions ? 'LOADING OPENF1 ARCHIVE...' : 'TUNING RADIO CHANNEL...'} /> : filteredRadios.length === 0 ? (
-          <p style={{ padding: '1.5rem 0.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>No radio recordings for these filters.</p>
+        {loadingSessions || loadingRadios ? <LoadingState message={loadingSessions ? `LOADING ${archiveSource}...` : 'TUNING RADIO CHANNEL...'} /> : filteredRadios.length === 0 ? (
+          <p style={{ padding: '1.5rem 0.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>{local2026 ? 'No local recordings match these filters.' : 'No radio recordings for these filters.'}</p>
         ) : filteredRadios.map((radio) => {
           const selected = radio.clip_id === selectedClipId;
           const time = radio.date ? new Date(radio.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';

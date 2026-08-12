@@ -15,6 +15,7 @@ from app.services.transcription import (
     transcribe_audio,
 )
 from app.services.openf1 import OpenF1Error, download_team_radio, radio_context
+from app.services.local_archive import LocalArchiveError, read_audio as read_local_audio, radio_context as local_radio_context
 from app.services.signal_assessment import derive_mood, screen_fatigue_cues
 
 
@@ -251,4 +252,18 @@ async def analyze_openf1_radio(
         save_clip=True,
     )
     result.year = context.get("year")
+    return result
+
+
+@router.post("/local-archive", response_model=AnalyzeResponse)
+async def analyze_local_archive_radio(clip_id: str = Form(...), lap_number: Optional[float] = Form(None)):
+    """Analyze a selected local MP3 with the existing Hugging Face workflow."""
+    try:
+        context = await asyncio.to_thread(local_radio_context, clip_id)
+        audio_bytes, content_type, record = await asyncio.to_thread(read_local_audio, clip_id)
+    except LocalArchiveError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    result = await analyze_audio_bytes(audio_bytes, content_type, record["audio_filename"], driver_code=context["driver_code"], driver_name=context["driver_name"], gp=context["gp"], session=context["session"], lap_number=lap_number if lap_number is not None else context["lap_number"], save_clip=False)
+    result.clip_id, result.audio_url, result.source, result.year = context["clip_id"], context["audio_url"], "local", 2026
+    result.gp, result.session, result.driver_code, result.driver_name = context["gp"], context["session"], context["driver_code"], context["driver_name"]
     return result

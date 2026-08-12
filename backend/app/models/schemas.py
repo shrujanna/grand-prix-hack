@@ -25,7 +25,7 @@ class Clip(BaseModel):
     lap_number: Optional[float] = None
     lap_is_ambiguous: Optional[bool] = None
     audio_url: str
-    source: Literal["archive", "live", "openf1"] = "archive"
+    source: Literal["archive", "live", "openf1", "local"] = "archive"
     uploaded_at: Optional[str] = None
     year: Optional[int] = None
     audio_duration_seconds: Optional[float] = None
@@ -58,7 +58,7 @@ class AnalyzeResponse(BaseModel):
     driver_name: Optional[str] = None
     lap_number: Optional[float] = None
     audio_url: Optional[str] = None
-    source: Optional[Literal["live"]] = None
+    source: Optional[Literal["live", "local"]] = None
     uploaded_at: Optional[str] = None
     year: Optional[int] = None
     mood_label: str = "unknown"

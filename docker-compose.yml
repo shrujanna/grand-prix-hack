@@ -18,10 +18,12 @@ services:
       HF_INFERENCE_TIMEOUT_SECONDS: ${HF_INFERENCE_TIMEOUT_SECONDS:-30}
       MAX_AUDIO_UPLOAD_BYTES: ${MAX_AUDIO_UPLOAD_BYTES:-20971520}
       MAX_AUDIO_DURATION_SECONDS: ${MAX_AUDIO_DURATION_SECONDS:-120}
+      LOCAL_ARCHIVE_MANIFEST_PATH: /all_clips.json
     volumes:
       # Optional: Mount the data directory to persist the FastF1 cache between container restarts
       - ./backend/app/data:/app/app/data
       - ./final_labeled_dataset.csv:/final_labeled_dataset.csv:ro
+      - ./all_clips.json:/all_clips.json:ro
 
   frontend:
     build: 
