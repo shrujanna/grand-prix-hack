@@ -77,9 +77,69 @@ class LapPoint(BaseModel):
     human_label: Optional[MoodLabel] = None
     human_label_intensity: Optional[int] = None
     is_ambiguous: Optional[bool] = None
+    concerning_radio_before: bool = False
+    concern_reason: Optional[str] = None
+    rolling_lap_time: Optional[float] = None
+    pace_trend: Optional[Literal["improving", "worsening", "stable", "warming_up"]] = None
+    sector_1_time: Optional[float] = None
+    sector_2_time: Optional[float] = None
+    sector_3_time: Optional[float] = None
+    tyre_compound: Optional[str] = None
+    tyre_age: Optional[float] = None
+    is_pit_lap: bool = False
+    track_status: Optional[str] = None
+    safety_car: bool = False
+    weather: Optional[str] = None
+    traffic: Optional[str] = None
+
+class PerformanceFlag(BaseModel):
+    clip_id: str
+    radio_lap: float
+    followup_lap: float
+    mood_label: Optional[str] = None
+    fatigue_label: Optional[str] = None
+    reason: str
+    followup_delta: float
+    followup_is_slower: bool
+    context_category: Literal["driver_state_signal", "race_condition"]
+    context_notes: List[str] = []
+
+class TimelineEvent(BaseModel):
+    lap_number: float
+    lap_time: float
+    delta_from_median: Optional[float] = None
+    pace_trend: Optional[Literal["improving", "worsening", "stable", "warming_up"]] = None
+    clip_id: Optional[str] = None
+    mood_label: Optional[str] = None
+    fatigue_label: Optional[str] = None
+    race_context: List[str] = []
+
+class StintSummary(BaseModel):
+    stint_number: int
+    start_lap: float
+    end_lap: float
+    lap_count: int
+    average_lap_time: float
+    concerning_radio_events: int = 0
+    mood_events: List[str] = []
+
+class PerformanceSummary(BaseModel):
+    baseline_lap_time: Optional[float] = None
+    radio_events: int = 0
+    concerning_events: int = 0
+    slower_followups: int = 0
+    average_followup_delta: Optional[float] = None
+    fastest_lap_time: Optional[float] = None
+    average_lap_time: Optional[float] = None
+    slowest_lap_time: Optional[float] = None
+    flags: List[PerformanceFlag] = []
+    timeline: List[TimelineEvent] = []
+    stints: List[StintSummary] = []
+    summary: str
 
 class LapChartResponse(BaseModel):
     gp: str
     session: str
     driver_code: str
     laps: List[LapPoint]
+    performance: PerformanceSummary

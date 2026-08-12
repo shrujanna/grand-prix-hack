@@ -3,6 +3,7 @@ from typing import List
 from app.models.schemas import LapChartResponse, LapPoint
 from app.services.lap_data import get_session_laps
 from app.services.data_loader import filter_clips
+from app.services.performance_insights import build_performance_insights
 
 router = APIRouter(
     prefix="/api/laps",
@@ -27,6 +28,10 @@ def get_laps(
     all_driver_clips = filter_clips(driver=driver, gp=gp)
     session_clips = [c for c in all_driver_clips if c.session.lower() == session.lower()]
     
+    performance = build_performance_insights(raw_laps, session_clips)
+    flags_by_followup_lap = {flag["followup_lap"]: flag for flag in performance["flags"]}
+    enrichment_by_lap = performance.pop("lap_enrichment")
+
     # Create a quick lookup dictionary by lap_number
     # (Assuming one clip per lap for simplicity of the chart overlay)
     clips_by_lap = {c.lap_number: c for c in session_clips if c.lap_number is not None}
@@ -37,6 +42,15 @@ def get_laps(
         lap_num = lap["lap_number"]
         lap_time = lap["lap_time"]
         delta = lap["delta_from_median"]
+        followup_flag = flags_by_followup_lap.get(float(lap_num))
+        enrichment = enrichment_by_lap.get(float(lap_num), {})
+        lap_context = {
+            key: lap.get(key)
+            for key in (
+                "sector_1_time", "sector_2_time", "sector_3_time", "tyre_compound", "tyre_age",
+                "is_pit_lap", "track_status", "safety_car", "weather", "traffic",
+            )
+        }
         
         # Check if we have a labeled clip overlay for this specific lap
         clip = clips_by_lap.get(lap_num)
@@ -50,7 +64,11 @@ def get_laps(
                     clip_id=clip.clip_id,
                     human_label=clip.human_label,
                     human_label_intensity=clip.human_label_intensity,
-                    is_ambiguous=clip.lap_is_ambiguous
+                    is_ambiguous=clip.lap_is_ambiguous,
+                    concerning_radio_before=bool(followup_flag),
+                    concern_reason=followup_flag["reason"] if followup_flag else None,
+                    **enrichment,
+                    **lap_context,
                 )
             )
         else:
@@ -62,7 +80,11 @@ def get_laps(
                     clip_id=None,
                     human_label=None,
                     human_label_intensity=None,
-                    is_ambiguous=None
+                    is_ambiguous=None,
+                    concerning_radio_before=bool(followup_flag),
+                    concern_reason=followup_flag["reason"] if followup_flag else None,
+                    **enrichment,
+                    **lap_context,
                 )
             )
             
@@ -70,5 +92,6 @@ def get_laps(
         gp=gp,
         session=session,
         driver_code=driver,
-        laps=lap_points
+        laps=lap_points,
+        performance=performance,
     )

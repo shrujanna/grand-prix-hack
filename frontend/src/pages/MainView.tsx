@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { AudioUploader, type AnalysisResult } from '../components/AudioUploader';
 import { OpenF1RadioArchive } from '../components/OpenF1RadioArchive';
 import { MoodDisplay } from '../components/MoodDisplay';
 import { LapChart } from '../components/LapChart';
 import { AudioPlayback } from '../components/AudioPlayback';
+import { PriorityQueue } from '../components/PriorityQueue';
 import { Card } from '../components/ui/Card';
 import '../theme/index.css';
 
@@ -14,16 +15,27 @@ export const MainView: React.FC = () => {
   const [analyzingOpenF1, setAnalyzingOpenF1] = useState(false);
   
   const [isLiveUpload, setIsLiveUpload] = useState(false);
+  const [selectedLapInsight, setSelectedLapInsight] = useState<any | null>(null);
+  const [latestRadio, setLatestRadio] = useState<any | null>(null);
 
   const handleLibrarySelect = (clip: any) => {
     setIsLiveUpload(false);
     setActiveData(clip);
   };
 
+  const handleSelectedLapInsight = useCallback((lap: any | null) => {
+    setSelectedLapInsight(lap);
+  }, []);
+
+  const statusColor = activeData?.fatigue_label === 'high' || ['frustrated', 'dejected'].includes(activeData?.mood_label)
+    ? 'var(--mood-frustrated)'
+    : activeData?.fatigue_label === 'watch' ? '#f5a623' : 'var(--mood-happy)';
+
   const handleLiveUpload = (result: AnalysisResult) => {
     setIsLiveUpload(true);
     setActiveData(result);
     setAnalysisError(null);
+    setLatestRadio(result);
   };
 
   const handleLiveTelemetryChange = (telemetry: { lapTimes: number[]; lapNumber: number | null }) => {
@@ -35,6 +47,14 @@ export const MainView: React.FC = () => {
   };
 
   const hasEnteredLapTimes = Array.isArray(activeData?.lap_times) && activeData.lap_times.length > 0;
+  const statusText = activeData?.fatigue_label === 'high' ? '⚑ CHECK DRIVER' : activeData?.fatigue_label === 'watch' ? '△ WATCH CUES' : ['frustrated', 'dejected'].includes(activeData?.mood_label || activeData?.human_label) ? '⚑ REVIEW SIGNAL' : '✓ NO ACTIVE CONCERN';
+  const labelExplanation = activeData?.fatigue_label === 'high'
+    ? 'Explicit tiredness or focus wording was found in the transcript. Confirm directly with the driver.'
+    : activeData?.fatigue_label === 'watch'
+      ? 'A weaker tiredness or focus cue was found. Monitor it with race context.'
+      : ['frustrated', 'dejected'].includes(activeData?.mood_label || activeData?.human_label)
+        ? 'The radio tone or words indicate a concerning mood signal. It is a prompt to review, not a diagnosis.'
+        : 'No concerning mood or fatigue cue is currently associated with this radio.';
 
   const analyzeSelectedOpenF1Radio = async () => {
     if (!activeData?.session_key || !activeData?.driver_number || !activeData?.date) return;
@@ -82,6 +102,45 @@ export const MainView: React.FC = () => {
         </div>
       </header>
 
+      {activeData && (
+        <Card variant="glass" style={{ padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'start' }}>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>CURRENT DRIVER STATE</p>
+              <p style={{ color: statusColor, fontWeight: 700, marginTop: '0.2rem', textTransform: 'uppercase' }}>{statusText}</p>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600, marginTop: '0.1rem', textTransform: 'uppercase', fontSize: '0.78rem' }}>{activeData.mood_label || activeData.human_label || 'Awaiting analysis'}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{activeData.mood_confidence ? `${Math.round(activeData.mood_confidence * 100)}% confidence` : activeData.mood_source ? activeData.mood_source : 'Analysis pending'}</p>
+            </div>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>DRIVER / TEAM</p>
+              <p style={{ color: 'var(--text-primary)', marginTop: '0.2rem' }}>{activeData.driver_code || '—'} {activeData.driver_name ? `· ${activeData.driver_name}` : ''}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{activeData.gp || 'Live radio'} · {activeData.session || '—'}</p>
+            </div>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>LATEST RADIO</p>
+              <p style={{ color: 'var(--text-primary)', marginTop: '0.2rem', fontSize: '0.78rem', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{activeData.transcript || activeData.text || 'No transcript yet.'}</p>
+            </div>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>ASSOCIATED LAP</p>
+              <p style={{ color: 'var(--text-primary)', marginTop: '0.2rem' }}>L{activeData.lap_number ?? '—'} {selectedLapInsight?.delta_from_median != null ? `· ${selectedLapInsight.delta_from_median >= 0 ? '+' : ''}${selectedLapInsight.delta_from_median.toFixed(3)}s` : ''}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{selectedLapInsight?.concern_reason || 'Compared with session median when timing loads.'}</p>
+            </div>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>WHAT THIS MEANS</p>
+              <p style={{ color: 'var(--text-secondary)', marginTop: '0.2rem', fontSize: '0.72rem', lineHeight: 1.4 }}>{labelExplanation}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {latestRadio && !activeData && (
+        <Card variant="glass" style={{ padding: '0.7rem 1rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+          Latest archive radio: <strong style={{ color: 'var(--text-primary)' }}>{latestRadio.driver_code}</strong> · {new Date(latestRadio.date).toLocaleTimeString()}. Select it from the archive to inspect it.
+        </Card>
+      )}
+
+      <PriorityQueue onClipSelect={handleLibrarySelect} refreshKey={activeData?.clip_id} />
+
       <div className="telemetry-main-grid">
         
         {/* Radio discovery is the primary surface. Live input is available without squeezing it out. */}
@@ -108,6 +167,7 @@ export const MainView: React.FC = () => {
               <OpenF1RadioArchive
                 compact
                 onClipSelect={handleLibrarySelect}
+                onLatestRadio={setLatestRadio}
                 selectedClipId={!isLiveUpload && activeData ? activeData.clip_id : undefined}
               />
             </div>
@@ -164,6 +224,8 @@ export const MainView: React.FC = () => {
                     selectedClipId={activeData.clip_id}
                     selectedLapNumber={activeData.lap_number}
                     lapTimes={activeData.lap_times}
+                    onClipSelect={handleLibrarySelect}
+                    onSelectedLapInsight={handleSelectedLapInsight}
                   />
                 </div>
               ) : (

@@ -18,6 +18,7 @@ export const MoodBadge: React.FC<MoodBadgeProps> = ({ mood, intensity, size = 'm
     md: { padding: '4px 12px', fontSize: '0.875rem' },
     lg: { padding: '6px 16px', fontSize: '1rem', fontWeight: 600 }
   };
+  const symbol = mood === 'frustrated' ? '!' : mood === 'dejected' ? '↓' : mood === 'happy' ? '↑' : mood === 'neutral' ? '•' : '×';
 
   const style: React.CSSProperties = {
     display: 'inline-flex',
@@ -36,13 +37,7 @@ export const MoodBadge: React.FC<MoodBadgeProps> = ({ mood, intensity, size = 'm
 
   return (
     <div style={style}>
-      <span style={{ 
-        width: '6px', 
-        height: '6px', 
-        borderRadius: '50%', 
-        backgroundColor: colorVar,
-        boxShadow: `0 0 8px ${colorVar}`
-      }} />
+      <span aria-hidden="true" style={{ fontWeight: 700, minWidth: '0.6rem', textAlign: 'center' }}>{symbol}</span>
       {mood === 'error' ? 'ERROR' : mood}
       {intensity && <span style={{ opacity: 0.7, marginLeft: '4px' }}>LVL.{intensity}</span>}
     </div>

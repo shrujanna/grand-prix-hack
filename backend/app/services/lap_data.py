@@ -51,6 +51,24 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
         valid_laps = laps.dropna(subset=['LapTime'])
         median_lap_time = valid_laps['LapTime'].median().total_seconds() if not valid_laps.empty else None
         
+        weather_data = getattr(session, "weather_data", None)
+
+        def seconds(value: Any) -> Optional[float]:
+            return None if pd.isna(value) else float(value.total_seconds())
+
+        def weather_for_lap(lap: Any) -> Optional[str]:
+            if weather_data is None or getattr(weather_data, "empty", True) or "Time" not in weather_data:
+                return None
+            lap_time_offset = lap.get("Time")
+            if pd.isna(lap_time_offset):
+                return None
+            earlier = weather_data[weather_data["Time"] <= lap_time_offset]
+            row = earlier.iloc[-1] if not earlier.empty else weather_data.iloc[0]
+            if bool(row.get("Rainfall", False)):
+                return "rain"
+            track_temp = row.get("TrackTemp")
+            return f"dry · track {float(track_temp):.0f}°C" if not pd.isna(track_temp) else "dry"
+
         result = []
         for _, lap in laps.iterrows():
             lap_num = float(lap['LapNumber'])
@@ -65,10 +83,25 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
             if median_lap_time is not None:
                 delta = lap_time_sec - median_lap_time
                 
+            raw_track_status = lap.get("TrackStatus")
+            track_status = None if pd.isna(raw_track_status) else str(raw_track_status).strip() or None
+            # FastF1 uses 4 for safety car and 6/7 for virtual safety-car states.
+            safety_car = bool(track_status and any(code in track_status.split(";") for code in ("4", "6", "7")))
             result.append({
                 "lap_number": lap_num,
                 "lap_time": lap_time_sec,
-                "delta_from_median": delta
+                "delta_from_median": delta,
+                "sector_1_time": seconds(lap.get("Sector1Time")),
+                "sector_2_time": seconds(lap.get("Sector2Time")),
+                "sector_3_time": seconds(lap.get("Sector3Time")),
+                "tyre_compound": str(lap.get("Compound")) if not pd.isna(lap.get("Compound")) else None,
+                "tyre_age": float(lap.get("TyreLife")) if not pd.isna(lap.get("TyreLife")) else None,
+                "is_pit_lap": not pd.isna(lap.get("PitInTime")) or not pd.isna(lap.get("PitOutTime")),
+                "track_status": track_status,
+                "safety_car": safety_car,
+                "weather": weather_for_lap(lap),
+                # Traffic needs car-position/telemetry analysis, which is not loaded here.
+                "traffic": None,
             })
             
         return result

@@ -32,6 +32,7 @@ type OpenF1Radio = {
 
 interface OpenF1RadioArchiveProps {
   onClipSelect: (clip: any) => void;
+  onLatestRadio?: (radio: any) => void;
   selectedClipId?: string;
   compact?: boolean;
 }
@@ -48,7 +49,7 @@ const selectStyle: React.CSSProperties = {
   fontSize: '0.75rem',
 };
 
-export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSelect, selectedClipId, compact = false }) => {
+export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSelect, onLatestRadio, selectedClipId, compact = false }) => {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(Math.min(currentYear, 2025));
   const [sessions, setSessions] = useState<OpenF1Session[]>([]);
@@ -62,6 +63,7 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
   const [loadingRadios, setLoadingRadios] = useState(false);
   const [resolvingClipId, setResolvingClipId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const meetings = useMemo(() => {
     const byKey = new Map<number, OpenF1Session>();
@@ -147,11 +149,23 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
         if (!response.ok) throw new Error((await response.json()).detail || 'Unable to load team radio.');
         return response.json();
       })
-      .then((nextRadios: OpenF1Radio[]) => !cancelled && setRadios(nextRadios))
+      .then((nextRadios: OpenF1Radio[]) => {
+        if (cancelled) return;
+        setRadios(nextRadios);
+        if (nextRadios[0]) onLatestRadio?.({ ...nextRadios[0], year, text: null, transcript: null, is_audio_only: true });
+      })
       .catch((requestError: Error) => !cancelled && setError(requestError.message))
       .finally(() => !cancelled && setLoadingRadios(false));
     return () => { cancelled = true; };
-  }, [sessionKey, driverNumber]);
+  }, [sessionKey, driverNumber, refreshTick, year, onLatestRadio]);
+
+  useEffect(() => {
+    if (!sessionKey) return;
+    const refresh = window.setInterval(() => {
+      setRefreshTick((current) => current + 1);
+    }, 30_000);
+    return () => window.clearInterval(refresh);
+  }, [sessionKey]);
 
   const selectRadio = async (radio: OpenF1Radio) => {
     setResolvingClipId(radio.clip_id);
