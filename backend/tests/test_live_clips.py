@@ -36,6 +36,13 @@ class LiveClipStoreTests(unittest.TestCase):
                         "text_model_label": "frustrated",
                         "text_model_intensity": 4,
                         "audio_duration_seconds": 2.5,
+                        "mood_label": "frustrated",
+                        "mood_confidence": 0.8,
+                        "mood_source": "combined",
+                        "fatigue_label": "watch",
+                        "fatigue_confidence": 0.5,
+                        "fatigue_evidence": ["self-reported tiredness"],
+                        "fatigue_status": "screened",
                     },
                 )
 
@@ -45,3 +52,6 @@ class LiveClipStoreTests(unittest.TestCase):
             self.assertEqual(clip.driver_code, "HAM")
             self.assertEqual(clips[0].clip_id, clip.clip_id)
             self.assertEqual(clips[0].audio_url, clip.audio_url)
+            self.assertEqual(clips[0].mood_label, "frustrated")
+            self.assertEqual(clips[0].fatigue_label, "watch")
+            self.assertEqual(clips[0].fatigue_evidence, ["self-reported tiredness"])

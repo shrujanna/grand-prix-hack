@@ -63,6 +63,30 @@ class AnalyzeRouteTests(unittest.TestCase):
         self.assertEqual(result.text_analysis_status, "skipped")
         self.assertIn("HF_TOKEN", result.transcription_error)
 
+    def test_uses_transcript_estimate_when_noisy_audio_tone_fails(self):
+        with patch("app.routers.analyze.classify_audio_emotion", side_effect=RuntimeError("Hugging Face API error 422")), patch(
+            "app.routers.analyze.transcribe_audio", return_value="The tyres are gone"
+        ), patch(
+            "app.routers.analyze.classify_text_sentiment", return_value={"label": "frustrated", "intensity": 4}
+        ):
+            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None, save_clip=False))
+
+        self.assertEqual(result.audio_analysis_status, "estimated")
+        self.assertTrue(result.audio_fallback)
+        self.assertEqual(result.audio_model_label, "frustrated")
+        self.assertEqual(result.mood_label, "frustrated")
+
+    def test_surfaces_explicit_fatigue_cues_from_the_transcript(self):
+        with patch("app.routers.analyze.classify_audio_emotion", return_value={"label": "dejected", "confidence": 0.7}), patch(
+            "app.routers.analyze.transcribe_audio", return_value="I'm exhausted and I can't focus"
+        ), patch(
+            "app.routers.analyze.classify_text_sentiment", return_value={"label": "dejected", "intensity": 4}
+        ):
+            result = asyncio.run(analyze_clip(audio=upload(), transcript=None, retry_services=None, save_clip=False))
+
+        self.assertEqual(result.fatigue_label, "high")
+        self.assertEqual(result.fatigue_status, "screened")
+
     def test_openf1_analysis_keeps_resolved_season_and_lap_metadata(self):
         response = AnalyzeResponse(audio_model_label="neutral", audio_model_confidence=0.7)
         with patch(

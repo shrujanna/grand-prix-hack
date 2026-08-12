@@ -29,6 +29,13 @@ class Clip(BaseModel):
     uploaded_at: Optional[str] = None
     year: Optional[int] = None
     audio_duration_seconds: Optional[float] = None
+    mood_label: Optional[str] = None
+    mood_confidence: Optional[float] = None
+    mood_source: Optional[str] = None
+    fatigue_label: Optional[str] = None
+    fatigue_confidence: Optional[float] = None
+    fatigue_evidence: List[str] = []
+    fatigue_status: Optional[str] = None
 
 class AnalyzeResponse(BaseModel):
     transcript: Optional[str] = None
@@ -38,8 +45,9 @@ class AnalyzeResponse(BaseModel):
     text_model_intensity: Optional[int] = None
     transcription_status: Literal["completed", "provided", "no_speech", "unavailable", "failed", "skipped"] = "skipped"
     transcription_error: Optional[str] = None
-    audio_analysis_status: Literal["completed", "unavailable", "failed", "skipped"] = "skipped"
+    audio_analysis_status: Literal["completed", "estimated", "unavailable", "failed", "skipped"] = "skipped"
     audio_analysis_error: Optional[str] = None
+    audio_fallback: bool = False
     text_analysis_status: Literal["completed", "unavailable", "failed", "skipped"] = "skipped"
     text_analysis_error: Optional[str] = None
     audio_duration_seconds: Optional[float] = None
@@ -53,6 +61,13 @@ class AnalyzeResponse(BaseModel):
     source: Optional[Literal["live"]] = None
     uploaded_at: Optional[str] = None
     year: Optional[int] = None
+    mood_label: str = "unknown"
+    mood_confidence: float = 0.0
+    mood_source: Literal["combined", "voice", "transcript", "unknown"] = "unknown"
+    fatigue_label: Literal["high", "watch", "no_signal", "unknown"] = "unknown"
+    fatigue_confidence: float = 0.0
+    fatigue_evidence: List[str] = []
+    fatigue_status: Literal["screened", "skipped"] = "skipped"
 
 class LapPoint(BaseModel):
     lap_number: float

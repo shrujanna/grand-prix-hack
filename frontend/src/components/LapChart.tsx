@@ -143,16 +143,20 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
           <input type="checkbox" checked={slowerLapsOnly} onChange={(event) => setSlowerLapsOnly(event.target.checked)} /> Slower laps only
         </label>
       </div>
-      {data.length === 1 && !loading && !error && (
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '-0.55rem', marginBottom: '0.55rem' }}>ONE LAP ENTERED — ADD MORE LAP TIMES TO SEE A PERFORMANCE TREND.</p>
-      )}
-      
       <div style={{ flex: 1, minHeight: 0 }}>
         {loading ? (
           <LoadingState message={`FETCHING TELEMETRY FOR ${driver}...`} />
         ) : error ? (
           <div style={{ color: 'var(--mood-frustrated)', textAlign: 'center', paddingTop: '2rem' }}>
             {error}
+          </div>
+        ) : dataWithSelectedRadio.length === 1 ? (
+          <div style={{ height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>LAP 1 TIME</p>
+              <p style={{ fontSize: '2.25rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: '0.25rem' }}>{dataWithSelectedRadio[0].lap_time.toFixed(3)}s</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.75rem' }}>Add one more lap time to plot the performance trend.</p>
+            </div>
           </div>
         ) : chartData.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', paddingTop: '2rem' }}>

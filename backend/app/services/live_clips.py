@@ -2,6 +2,7 @@ import mimetypes
 import os
 import sqlite3
 import uuid
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional
@@ -41,10 +42,31 @@ def _connection() -> sqlite3.Connection:
             lap_number REAL,
             audio_url TEXT NOT NULL,
             audio_duration_seconds REAL,
-            uploaded_at TEXT NOT NULL
+            uploaded_at TEXT NOT NULL,
+            mood_label TEXT,
+            mood_confidence REAL,
+            mood_source TEXT,
+            fatigue_label TEXT,
+            fatigue_confidence REAL,
+            fatigue_evidence TEXT,
+            fatigue_status TEXT
         )
         """
     )
+    # Existing local databases were created before Priority 2. Keep upgrades
+    # non-destructive for operators' saved live radio clips.
+    existing_columns = {row["name"] for row in connection.execute("PRAGMA table_info(live_clips)")}
+    for name, column_type in {
+        "mood_label": "TEXT",
+        "mood_confidence": "REAL",
+        "mood_source": "TEXT",
+        "fatigue_label": "TEXT",
+        "fatigue_confidence": "REAL",
+        "fatigue_evidence": "TEXT",
+        "fatigue_status": "TEXT",
+    }.items():
+        if name not in existing_columns:
+            connection.execute(f"ALTER TABLE live_clips ADD COLUMN {name} {column_type}")
     return connection
 
 
@@ -95,6 +117,13 @@ def _clip_from_row(row: sqlite3.Row) -> Clip:
         source="live",
         uploaded_at=row["uploaded_at"],
         audio_duration_seconds=row["audio_duration_seconds"],
+        mood_label=row["mood_label"],
+        mood_confidence=row["mood_confidence"],
+        mood_source=row["mood_source"],
+        fatigue_label=row["fatigue_label"],
+        fatigue_confidence=row["fatigue_confidence"],
+        fatigue_evidence=json.loads(row["fatigue_evidence"]) if row["fatigue_evidence"] else [],
+        fatigue_status=row["fatigue_status"],
     )
 
 
@@ -128,8 +157,10 @@ def save_live_clip(
                 clip_id, gp, session, driver_code, driver_name, speaker, text,
                 human_label, human_label_intensity, audio_model_label,
                 audio_model_confidence, text_model_label, text_model_intensity,
-                lap_number, audio_url, audio_duration_seconds, uploaded_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                lap_number, audio_url, audio_duration_seconds, uploaded_at,
+                mood_label, mood_confidence, mood_source, fatigue_label,
+                fatigue_confidence, fatigue_evidence, fatigue_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 clip_id,
@@ -149,6 +180,13 @@ def save_live_clip(
                 audio_url,
                 analysis.get("audio_duration_seconds"),
                 uploaded_at,
+                analysis.get("mood_label"),
+                analysis.get("mood_confidence"),
+                analysis.get("mood_source"),
+                analysis.get("fatigue_label"),
+                analysis.get("fatigue_confidence"),
+                json.dumps(analysis.get("fatigue_evidence", [])),
+                analysis.get("fatigue_status"),
             ),
         )
 
@@ -172,4 +210,11 @@ def save_live_clip(
         source="live",
         uploaded_at=uploaded_at,
         audio_duration_seconds=analysis.get("audio_duration_seconds"),
+        mood_label=analysis.get("mood_label"),
+        mood_confidence=analysis.get("mood_confidence"),
+        mood_source=analysis.get("mood_source"),
+        fatigue_label=analysis.get("fatigue_label"),
+        fatigue_confidence=analysis.get("fatigue_confidence"),
+        fatigue_evidence=analysis.get("fatigue_evidence", []),
+        fatigue_status=analysis.get("fatigue_status"),
     )

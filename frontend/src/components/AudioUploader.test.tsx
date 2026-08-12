@@ -79,4 +79,16 @@ describe('AudioUploader', () => {
     expect(retryForm.get('retry_services')).toBe('audio')
     expect(retryForm.get('transcript')).toBe('I cannot find grip.')
   })
+
+  it('parses lap times while the operator enters them', () => {
+    const onTelemetryChange = vi.fn()
+    render(<AudioUploader onAnalysisComplete={vi.fn()} onError={vi.fn()} onTelemetryChange={onTelemetryChange} />)
+
+    fireEvent.change(screen.getByLabelText('Lap times'), { target: { value: '1:31.677, 90.442' } })
+
+    const latestTelemetry = onTelemetryChange.mock.calls.at(-1)?.[0]
+    expect(latestTelemetry.lapNumber).toBeNull()
+    expect(latestTelemetry.lapTimes[0]).toBeCloseTo(91.677, 3)
+    expect(latestTelemetry.lapTimes[1]).toBeCloseTo(90.442, 3)
+  })
 })

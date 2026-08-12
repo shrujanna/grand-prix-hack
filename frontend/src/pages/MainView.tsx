@@ -27,8 +27,7 @@ export const MainView: React.FC = () => {
   };
 
   const handleLiveTelemetryChange = (telemetry: { lapTimes: number[]; lapNumber: number | null }) => {
-    if (!isLiveUpload) return;
-    setActiveData((current: any) => current ? {
+    setActiveData((current: any) => current?.source === 'live' ? {
       ...current,
       lap_times: telemetry.lapTimes,
       lap_number: telemetry.lapNumber ?? current.lap_number,
@@ -130,6 +129,14 @@ export const MainView: React.FC = () => {
                   transcriptionStatus={activeData.transcription_status}
                   audioStatus={activeData.audio_analysis_status}
                   textStatus={activeData.text_analysis_status}
+                  audioFallback={activeData.audio_fallback}
+                  moodLabel={activeData.mood_label}
+                  moodConfidence={activeData.mood_confidence}
+                  moodSource={activeData.mood_source}
+                  fatigueLabel={activeData.fatigue_label}
+                  fatigueConfidence={activeData.fatigue_confidence}
+                  fatigueEvidence={activeData.fatigue_evidence}
+                  fatigueStatus={activeData.fatigue_status}
                 />
                 {activeData.audio_url && (
                   <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" />

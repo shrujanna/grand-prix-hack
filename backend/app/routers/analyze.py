@@ -15,6 +15,7 @@ from app.services.transcription import (
     transcribe_audio,
 )
 from app.services.openf1 import OpenF1Error, download_team_radio, radio_context
+from app.services.signal_assessment import derive_mood, screen_fatigue_cues
 
 
 router = APIRouter(prefix="/api/analyze", tags=["Analyze"])
@@ -93,9 +94,17 @@ async def analyze_audio_bytes(
         "transcription_error": None,
         "audio_analysis_status": "skipped",
         "audio_analysis_error": None,
+        "audio_fallback": False,
         "text_analysis_status": "skipped",
         "text_analysis_error": None,
         "audio_duration_seconds": duration,
+        "mood_label": "unknown",
+        "mood_confidence": 0.0,
+        "mood_source": "unknown",
+        "fatigue_label": "unknown",
+        "fatigue_confidence": 0.0,
+        "fatigue_evidence": [],
+        "fatigue_status": "skipped",
     }
 
     # The independent audio-tone and speech-to-text calls run concurrently.
@@ -129,6 +138,15 @@ async def analyze_audio_bytes(
             response["text_model_label"] = text_result["label"]
             response["text_model_intensity"] = text_result["intensity"]
             response["text_analysis_status"] = "completed"
+            if response["audio_analysis_status"] in {"failed", "unavailable"}:
+                # A noisy radio can still produce a trustworthy transcript.
+                # Keep the distinction transparent, but provide a useful
+                # fallback signal instead of leaving voice tone as unknown.
+                response["audio_model_label"] = text_result["label"]
+                response["audio_model_confidence"] = min(1.0, max(0.2, text_result["intensity"] / 5))
+                response["audio_analysis_status"] = "estimated"
+                response["audio_analysis_error"] = "Acoustic tone could not be isolated from radio noise; showing a transcript-derived estimate."
+                response["audio_fallback"] = True
         except Exception as error:
             status, message = _service_error("text", error)
             response["text_analysis_status"] = status
@@ -136,6 +154,19 @@ async def analyze_audio_bytes(
     elif "text" in requested and not response["transcript"]:
         response["text_analysis_status"] = "skipped"
         response["text_analysis_error"] = "Text sentiment needs a transcript first."
+
+    response.update(
+        derive_mood(
+            audio_label=response["audio_model_label"],
+            audio_confidence=response["audio_model_confidence"],
+            audio_status=response["audio_analysis_status"],
+            text_label=response["text_model_label"],
+            text_intensity=response["text_model_intensity"],
+            text_status=response["text_analysis_status"],
+            audio_fallback=response["audio_fallback"],
+        ),
+        **screen_fatigue_cues(response["transcript"]),
+    )
 
     # Original live uploads are saved for future review. Service-only retries
     # update the on-screen result without creating duplicate archive entries.

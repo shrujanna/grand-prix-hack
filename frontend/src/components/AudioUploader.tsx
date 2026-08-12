@@ -3,7 +3,7 @@ import { Card } from './ui/Card';
 import { AudioPlayback } from './AudioPlayback';
 
 type ServiceName = 'transcription' | 'audio' | 'text';
-type ServiceStatus = 'completed' | 'provided' | 'no_speech' | 'unavailable' | 'failed' | 'skipped';
+type ServiceStatus = 'completed' | 'provided' | 'estimated' | 'no_speech' | 'unavailable' | 'failed' | 'skipped';
 
 export interface AnalysisResult {
   transcript?: string | null;
@@ -28,6 +28,14 @@ export interface AnalysisResult {
   source?: 'live';
   uploaded_at?: string | null;
   lap_times?: number[];
+  audio_fallback?: boolean;
+  mood_label?: 'frustrated' | 'neutral' | 'happy' | 'dejected' | 'unknown';
+  mood_confidence?: number;
+  mood_source?: 'combined' | 'voice' | 'transcript' | 'unknown';
+  fatigue_label?: 'high' | 'watch' | 'no_signal' | 'unknown';
+  fatigue_confidence?: number;
+  fatigue_evidence?: string[];
+  fatigue_status?: 'screened' | 'skipped';
 }
 
 interface AudioUploaderProps {
@@ -64,6 +72,7 @@ const serviceDetails: Array<{ name: ServiceName; label: string; statusKey: keyof
 
 const statusColor = (status: ServiceStatus) => {
   if (status === 'completed' || status === 'provided') return 'var(--mood-happy)';
+  if (status === 'estimated') return 'var(--mood-neutral)';
   if (status === 'skipped') return 'var(--text-muted)';
   return 'var(--mood-frustrated)';
 };
@@ -178,7 +187,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
         lapNumber: nextContext.lapNumber ? Number(nextContext.lapNumber) : null,
       });
     } catch {
-      // Validation is shown when the operator starts analysis, not while typing.
+      onTelemetryChange?.({ lapTimes: [], lapNumber: nextContext.lapNumber ? Number(nextContext.lapNumber) : null });
     }
   };
 
@@ -191,7 +200,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
         lapNumber: lapNumber ? Number(lapNumber) : null,
       });
     } catch {
-      // See updateLapTimes.
+      onTelemetryChange?.({ lapTimes: [], lapNumber: lapNumber ? Number(lapNumber) : null });
     }
   };
 
@@ -310,7 +319,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
     ? serviceDetails
       .filter(({ statusKey }) => {
         const status = analysis[statusKey] as ServiceStatus;
-        return !['completed', 'provided', 'skipped'].includes(status);
+        return !['completed', 'provided', 'estimated', 'skipped'].includes(status);
       })
       .map(({ name }) => name)
     : [];

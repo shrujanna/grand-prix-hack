@@ -11,6 +11,14 @@ interface MoodDisplayProps {
   transcriptionStatus?: string | null;
   audioStatus?: string | null;
   textStatus?: string | null;
+  audioFallback?: boolean;
+  moodLabel?: string | null;
+  moodConfidence?: number | null;
+  moodSource?: string | null;
+  fatigueLabel?: string | null;
+  fatigueConfidence?: number | null;
+  fatigueEvidence?: string[] | null;
+  fatigueStatus?: string | null;
 }
 
 export const MoodDisplay: React.FC<MoodDisplayProps> = ({
@@ -21,7 +29,15 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
   textIntensity,
   transcriptionStatus,
   audioStatus,
-  textStatus
+  textStatus,
+  audioFallback,
+  moodLabel,
+  moodConfidence,
+  moodSource,
+  fatigueLabel,
+  fatigueConfidence,
+  fatigueEvidence,
+  fatigueStatus,
 }) => {
   // Derive a rough 1-5 intensity for audio based on confidence (0-1) so it visually matches the text intensity badge
   const derivedAudioIntensity = audioConfidence 
@@ -75,7 +91,7 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
               color: 'var(--text-muted)',
               fontFamily: 'var(--font-mono)'
             }}>
-              AUDIO VIBRATION SIGNAL
+              {audioFallback ? 'NOISY-RADIO FALLBACK' : 'AUDIO VIBRATION SIGNAL'}
             </span>
             <div>
               <MoodBadge 
@@ -89,6 +105,7 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
                 Confidence: {(audioConfidence * 100).toFixed(1)}%
               </span>
             )}
+            {audioFallback && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated from the transcript because noise blocked a reliable acoustic read.</span>}
           </div>
 
           {/* Text Signal */}
@@ -116,6 +133,39 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
           </div>
 
         </div>
+
+        <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>OPERATOR MOOD SIGNAL</span>
+            {moodLabel && moodLabel !== 'unknown' ? (
+              <>
+                <MoodBadge mood={moodLabel as any} intensity={moodConfidence ? Math.max(1, Math.round(moodConfidence * 5)) : undefined} size="md" />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {moodSource === 'combined' ? 'Voice + transcript' : moodSource === 'voice' ? 'Voice signal' : 'Transcript signal'}
+                  {moodConfidence ? ` · ${(moodConfidence * 100).toFixed(0)}% confidence` : ''}
+                </span>
+              </>
+            ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No reliable mood signal</span>}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>FATIGUE CUE SCREEN</span>
+            {fatigueStatus === 'screened' ? (
+              <>
+                <span style={{ display: 'inline-flex', alignSelf: 'flex-start', borderRadius: 'var(--radius-full)', border: `1px solid ${fatigueLabel === 'high' ? 'var(--mood-frustrated)' : fatigueLabel === 'watch' ? '#f5a623' : 'var(--border-subtle)'}`, color: fatigueLabel === 'high' ? 'var(--mood-frustrated)' : fatigueLabel === 'watch' ? '#f5a623' : 'var(--text-secondary)', padding: '4px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', textTransform: 'uppercase' }}>
+                  {fatigueLabel === 'high' ? 'Check driver' : fatigueLabel === 'watch' ? 'Watch cues' : 'No cue found'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {fatigueEvidence?.length ? fatigueEvidence.join(' · ') : 'No explicit tiredness or focus cue in the transcript.'}
+                  {fatigueConfidence ? ` · ${(fatigueConfidence * 100).toFixed(0)}% cue strength` : ''}
+                </span>
+              </>
+            ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Transcript required</span>}
+          </div>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', lineHeight: 1.45 }}>Fatigue is a transcript cue screen, not a medical assessment. Confirm any concern with the driver and team protocol.</p>
       </div>
     </Card>
   );
