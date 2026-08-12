@@ -61,6 +61,13 @@ class AnalyzeResponse(BaseModel):
     source: Optional[Literal["live", "local"]] = None
     uploaded_at: Optional[str] = None
     year: Optional[int] = None
+    tyre_compound: Optional[str] = None
+    tyre_age: Optional[float] = None
+    is_pit_lap: bool = False
+    pit_duration: Optional[float] = None
+    position: Optional[int] = None
+    position_change: Optional[int] = None
+    traffic: Optional[str] = None
     mood_label: str = "unknown"
     mood_confidence: float = 0.0
     mood_source: Literal["combined", "voice", "transcript", "unknown"] = "unknown"
@@ -87,10 +94,14 @@ class LapPoint(BaseModel):
     tyre_compound: Optional[str] = None
     tyre_age: Optional[float] = None
     is_pit_lap: bool = False
+    pit_duration: Optional[float] = None
+    position: Optional[int] = None
+    position_change: Optional[int] = None
     track_status: Optional[str] = None
     safety_car: bool = False
     weather: Optional[str] = None
     traffic: Optional[str] = None
+    pace_drop: bool = False
 
 class PerformanceFlag(BaseModel):
     clip_id: str

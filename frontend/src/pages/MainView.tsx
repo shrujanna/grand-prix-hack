@@ -3,6 +3,7 @@ import { AudioUploader, type AnalysisResult } from '../components/AudioUploader'
 import { OpenF1RadioArchive } from '../components/OpenF1RadioArchive';
 import { MoodDisplay } from '../components/MoodDisplay';
 import { LapChart } from '../components/LapChart';
+import { TrackMap } from '../components/TrackMap';
 import { AudioPlayback } from '../components/AudioPlayback';
 import { PriorityQueue } from '../components/PriorityQueue';
 import { Card } from '../components/ui/Card';
@@ -222,20 +223,36 @@ export const MainView: React.FC = () => {
                 )}
               </div>
 
-              {/* Bottom Right: Telemetry Chart */}
+              {/* Bottom Right: Telemetry Chart and Track Map */}
               {hasEnteredLapTimes || (activeData.gp && activeData.session && activeData.driver_code && activeData.driver_code !== 'LIVE' && activeData.gp !== 'Live uploads') ? (
-                <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                  <LapChart 
-                    gp={activeData.gp || ''}
-                    session={activeData.session || ''}
-                    driver={activeData.driver_code || 'LIVE'}
-                    year={activeData.year}
-                    selectedClipId={activeData.clip_id}
-                    selectedLapNumber={activeData.lap_number}
-                    selectedMoodLabel={activeData.mood_label || activeData.human_label}
-                    lapTimes={activeData.lap_times}
-                    onSelectedLapInsight={handleSelectedLapInsight}
-                  />
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: '1.25rem', flexDirection: 'row' }}>
+                  <div style={{ flex: 2, display: 'flex', minWidth: 0, minHeight: 0 }}>
+                    <LapChart 
+                      gp={activeData.gp || ''}
+                      session={activeData.session || ''}
+                      driver={activeData.driver_code || 'LIVE'}
+                      year={activeData.year}
+                      selectedClipId={activeData.clip_id}
+                      selectedLapNumber={activeData.lap_number}
+                      selectedMoodLabel={activeData.mood_label || activeData.human_label}
+                      lapTimes={activeData.lap_times}
+                      onSelectedLapInsight={handleSelectedLapInsight}
+                    />
+                  </div>
+                  {/* Track map is only available for FastF1 archive sessions, not manual live uploads with just lap times */}
+                  {!hasEnteredLapTimes && (
+                    <div style={{ flex: 1, display: 'flex', minWidth: 0, minHeight: 0 }}>
+                      <TrackMap
+                        gp={activeData.gp || ''}
+                        session={activeData.session || ''}
+                        driver={activeData.driver_code || 'LIVE'}
+                        year={activeData.year}
+                        selectedLapNumber={activeData.lap_number}
+                        selectedMoodLabel={activeData.mood_label || activeData.human_label}
+                        selectedClipId={activeData.clip_id}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <Card variant="glass" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

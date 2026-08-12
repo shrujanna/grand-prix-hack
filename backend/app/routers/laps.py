@@ -48,7 +48,7 @@ def get_laps(
             key: lap.get(key)
             for key in (
                 "sector_1_time", "sector_2_time", "sector_3_time", "tyre_compound", "tyre_age",
-                "is_pit_lap", "track_status", "safety_car", "weather", "traffic",
+                "is_pit_lap", "pit_duration", "position", "position_change", "track_status", "safety_car", "weather", "traffic", "pace_drop"
             )
         }
         

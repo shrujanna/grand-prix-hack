@@ -48,16 +48,50 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
             return []
             
         # Calculate median lap time (ignoring NaN/outlaps/inlaps that might lack LapTime)
-        valid_laps = laps.dropna(subset=['LapTime'])
+        valid_laps = session.laps.pick_driver(driver_code).dropna(subset=['LapTime'])
         median_lap_time = valid_laps['LapTime'].median().total_seconds() if not valid_laps.empty else None
+        
+        all_laps = session.laps.dropna(subset=['Time']).sort_values('Time').reset_index(drop=True)
+        driver_laps = all_laps[all_laps['Driver'] == driver_code]
         
         def seconds(value: Any) -> Optional[float]:
             return None if pd.isna(value) else float(value.total_seconds())
 
         result = []
-        for _, lap in laps.iterrows():
+        prev_pos = None
+        last_pit_in = None
+        
+        for idx, lap in driver_laps.iterrows():
             lap_num = float(lap['LapNumber'])
             lap_time_td = lap['LapTime']
+            
+            # Traffic calculation
+            traffic = None
+            if idx > 0:
+                prev_lap = all_laps.iloc[idx - 1]
+                # If they finished just behind someone, it's traffic
+                gap = (lap['Time'] - prev_lap['Time']).total_seconds()
+                if 0 < gap < 2.0:
+                    traffic = f"{prev_lap['Driver']} ({gap:.1f}s)"
+            
+            # Track position changes
+            curr_pos = int(lap['Position']) if not pd.isna(lap.get('Position')) else None
+            pos_change = None
+            if curr_pos is not None and prev_pos is not None:
+                pos_change = prev_pos - curr_pos
+            if curr_pos is not None:
+                prev_pos = curr_pos
+                
+            # Track pit duration
+            pit_in = lap.get("PitInTime")
+            pit_out = lap.get("PitOutTime")
+            pit_duration = None
+            
+            if not pd.isna(pit_in):
+                last_pit_in = pit_in
+            if not pd.isna(pit_out) and last_pit_in is not None:
+                pit_duration = float((pit_out - last_pit_in).total_seconds())
+                last_pit_in = None
             
             if pd.isna(lap_time_td):
                 continue # Skip laps without a recorded time
@@ -65,13 +99,19 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
             lap_time_sec = lap_time_td.total_seconds()
             
             delta = None
-            if median_lap_time is not None:
-                delta = lap_time_sec - median_lap_time
-                
+            pace_drop = False
+            
             raw_track_status = lap.get("TrackStatus")
             track_status = None if pd.isna(raw_track_status) else str(raw_track_status).strip() or None
-            # FastF1 uses 4 for safety car and 6/7 for virtual safety-car states.
             safety_car = bool(track_status and any(code in track_status.split(";") for code in ("4", "6", "7")))
+            
+            is_pit_lap = not pd.isna(lap.get("PitInTime")) or not pd.isna(lap.get("PitOutTime"))
+            
+            if median_lap_time is not None:
+                delta = lap_time_sec - median_lap_time
+                if delta > 1.5 and lap_num > 1 and not is_pit_lap and not safety_car:
+                    pace_drop = True
+
             result.append({
                 "lap_number": lap_num,
                 "lap_time": lap_time_sec,
@@ -81,15 +121,15 @@ def get_session_laps(year: int, gp: str, session_type: str, driver_code: str) ->
                 "sector_3_time": seconds(lap.get("Sector3Time")),
                 "tyre_compound": str(lap.get("Compound")) if not pd.isna(lap.get("Compound")) else None,
                 "tyre_age": float(lap.get("TyreLife")) if not pd.isna(lap.get("TyreLife")) else None,
-                "is_pit_lap": not pd.isna(lap.get("PitInTime")) or not pd.isna(lap.get("PitOutTime")),
+                "is_pit_lap": is_pit_lap,
+                "pit_duration": pit_duration,
+                "position": curr_pos,
+                "position_change": pos_change,
                 "track_status": track_status,
                 "safety_car": safety_car,
-                # This view only needs lap timing. Weather is intentionally not
-                # loaded, so accessing FastF1's weather property here would
-                # raise and hide otherwise valid lap data.
                 "weather": None,
-                # Traffic needs car-position/telemetry analysis, which is not loaded here.
-                "traffic": None,
+                "traffic": traffic,
+                "pace_drop": pace_drop,
             })
             
         return result

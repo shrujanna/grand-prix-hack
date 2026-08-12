@@ -1,3 +1,8 @@
 # Local service credentials
 /.env
 /backend/.env
+
+# Data caches
+backend/app/data/fastf1_cache/
+backend/app/data/live_uploads/
+backend/app/data/live_clips.sqlite3

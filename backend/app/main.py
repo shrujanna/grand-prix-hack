@@ -25,7 +25,7 @@ app.add_middleware(
 def health_check():
     return {"status": "ok", "message": "Backend is running successfully."}
 
-from app.routers import clips, analyze, laps, local_archive, openf1
+from app.routers import clips, analyze, laps, local_archive, openf1, telemetry
 from app.services.live_clips import upload_directory
 from app.services.local_archive import archive_audio_directory
 app.mount("/media", StaticFiles(directory=upload_directory()), name="media")
@@ -35,3 +35,4 @@ app.include_router(analyze.router)
 app.include_router(laps.router)
 app.include_router(openf1.router)
 app.include_router(local_archive.router)
+app.include_router(telemetry.router)

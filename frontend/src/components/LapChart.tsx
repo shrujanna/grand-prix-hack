@@ -82,7 +82,8 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
 
   const contextLabel = (lap: any) => [
     lap.tyre_compound ? `${lap.tyre_compound}${lap.tyre_age != null ? ` · ${lap.tyre_age} laps` : ''}` : null,
-    lap.is_pit_lap ? 'pit lap' : null,
+    lap.is_pit_lap ? (lap.pit_duration ? `pit out (${lap.pit_duration.toFixed(1)}s)` : 'pit in') : null,
+    lap.position != null ? `P${lap.position}${lap.position_change ? ` (${lap.position_change > 0 ? '+' : ''}${lap.position_change})` : ''}` : null,
     lap.safety_car ? 'safety-car/VSC' : null,
     lap.weather || null,
     lap.traffic ? `traffic: ${lap.traffic}` : null,
@@ -126,6 +127,18 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
           {data.selected_radio && (
             <div style={{ marginTop: '8px', color: getMoodColor(data.radio_mood) }}>
               <p>Selected radio: {data.radio_mood?.toUpperCase() || 'AWAITING ANALYSIS'}</p>
+              {data.traffic && (
+                <p style={{ marginTop: '4px', color: '#f5a623', fontWeight: 'bold' }}>⚠️ DIRTY AIR ALERT: {data.traffic}</p>
+              )}
+              {data.pace_drop && (
+                <p style={{ marginTop: '4px', color: '#ff4757', fontWeight: 'bold' }}>⚠️ SIGNIFICANT PACE DROP (+{data.delta_from_median?.toFixed(1)}s)</p>
+              )}
+              {data.position_change > 0 && (
+                <p style={{ marginTop: '4px', color: '#2ed573', fontWeight: 'bold' }}>⚡ OVERTAKE LAP (+{data.position_change} POS)</p>
+              )}
+              {data.position_change < 0 && (
+                <p style={{ marginTop: '4px', color: '#ff4757', fontWeight: 'bold' }}>⚠️ POSITION LOST ({data.position_change} POS)</p>
+              )}
             </div>
           )}
         </div>
