@@ -1,0 +1,39 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: f1_telemetry_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Docker Compose loads these from the repository-root .env file.
+      # HF_TOKEN is Hugging Face's current standard name; HF_API_KEY remains
+      # supported for existing deployments.
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_API_KEY: ${HF_API_KEY:-}
+      HF_ASR_MODEL_ID: ${HF_ASR_MODEL_ID:-openai/whisper-large-v3}
+      HF_ASR_TIMEOUT_SECONDS: ${HF_ASR_TIMEOUT_SECONDS:-60}
+      HF_ASR_MAX_RETRIES: ${HF_ASR_MAX_RETRIES:-2}
+      HF_INFERENCE_TIMEOUT_SECONDS: ${HF_INFERENCE_TIMEOUT_SECONDS:-30}
+      MAX_AUDIO_UPLOAD_BYTES: ${MAX_AUDIO_UPLOAD_BYTES:-20971520}
+      MAX_AUDIO_DURATION_SECONDS: ${MAX_AUDIO_DURATION_SECONDS:-120}
+      LOCAL_ARCHIVE_MANIFEST_PATH: /all_clips.json
+    volumes:
+      # Optional: Mount the data directory to persist the FastF1 cache between container restarts
+      - ./backend/app/data:/app/app/data
+      - ./final_labeled_dataset.csv:/final_labeled_dataset.csv:ro
+      - ./all_clips.json:/all_clips.json:ro
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: f1_telemetry_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      # Instruct the Vite build to point to the backend container
+      - VITE_API_BASE_URL=http://localhost:8000
