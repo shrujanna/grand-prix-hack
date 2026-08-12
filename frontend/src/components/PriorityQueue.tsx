@@ -4,13 +4,14 @@ import { Card } from './ui/Card';
 interface PriorityQueueProps {
   onClipSelect: (clip: any) => void;
   refreshKey?: string | null;
+  maxItems?: number;
 }
 
 const storageKey = 'pit-wall-acknowledged-clips';
 const getMood = (clip: any) => String(clip.mood_label || clip.human_label || clip.audio_model_label || '').toLowerCase();
 const isConcerning = (clip: any) => ['frustrated', 'dejected'].includes(getMood(clip)) || ['high', 'watch'].includes(clip.fatigue_label);
 
-export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refreshKey }) => {
+export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refreshKey, maxItems = 3 }) => {
   const [clips, setClips] = useState<any[]>([]);
   const [acknowledged, setAcknowledged] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; }
@@ -40,7 +41,7 @@ export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refr
       const score = (clip: any) => (clip.fatigue_label === 'high' ? 3 : clip.fatigue_label === 'watch' ? 2 : 1) + (acknowledged.includes(clip.clip_id) ? -10 : 0);
       return score(right) - score(left);
     })
-    .slice(0, 5), [acknowledged, clips]);
+    .slice(0, maxItems), [acknowledged, clips, maxItems]);
 
   const acknowledge = (clipId: string) => {
     setAcknowledged((current) => {
@@ -52,20 +53,20 @@ export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refr
 
   if (!queue.length) return null;
   return (
-    <Card variant="glass" style={{ padding: '0.8rem 1rem' }} aria-label="Priority radio queue">
+    <Card variant="glass" style={{ padding: '0.7rem 0.8rem' }} aria-label="Priority radio queue">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
         <p style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>⚑ PRIORITY RADIO QUEUE</p>
         <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>{queue.filter((clip) => !acknowledged.includes(clip.clip_id)).length} UNACKNOWLEDGED</p>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.55rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.45rem' }}>
         {queue.map((clip) => {
           const done = acknowledged.includes(clip.clip_id);
           const label = clip.fatigue_label === 'high' ? 'CHECK DRIVER' : clip.fatigue_label === 'watch' ? 'WATCH CUES' : `${getMood(clip).toUpperCase()} SIGNAL`;
           return (
-            <div key={clip.clip_id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', alignItems: 'center', borderLeft: `3px solid ${done ? 'var(--text-muted)' : clip.fatigue_label === 'high' ? 'var(--mood-frustrated)' : '#f5a623'}`, padding: '0.38rem 0 0.38rem 0.55rem' }}>
+            <div key={clip.clip_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.5rem', alignItems: 'center', borderLeft: `3px solid ${done ? 'var(--text-muted)' : clip.fatigue_label === 'high' ? 'var(--mood-frustrated)' : '#f5a623'}`, padding: '0.32rem 0 0.32rem 0.5rem' }}>
               <button type="button" onClick={() => onClipSelect(clip)} style={{ border: 0, background: 'transparent', color: 'var(--text-primary)', textAlign: 'left', cursor: 'pointer', padding: 0 }}>
                 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{done ? '✓ REVIEWED' : '⚑ REVIEW'} · {clip.driver_code} · {label}</strong>
-                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.7rem', marginTop: '0.12rem', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{clip.text || 'Transcript pending'}</span>
+                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '0.12rem', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{clip.text || 'Transcript pending'}</span>
               </button>
               <button type="button" onClick={() => acknowledge(clip.clip_id)} disabled={done} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: done ? 'var(--text-muted)' : 'var(--text-primary)', padding: '0.3rem 0.45rem', cursor: done ? 'default' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.62rem' }}>{done ? 'ACKNOWLEDGED' : 'ACKNOWLEDGE'}</button>
             </div>

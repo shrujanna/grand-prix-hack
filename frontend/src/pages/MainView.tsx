@@ -133,14 +133,6 @@ export const MainView: React.FC = () => {
         </Card>
       )}
 
-      {latestRadio && !activeData && (
-        <Card variant="glass" style={{ padding: '0.7rem 1rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-          Latest archive radio: <strong style={{ color: 'var(--text-primary)' }}>{latestRadio.driver_code}</strong> · {new Date(latestRadio.date).toLocaleTimeString()}. Select it from the archive to inspect it.
-        </Card>
-      )}
-
-      <PriorityQueue onClipSelect={handleLibrarySelect} refreshKey={activeData?.clip_id} />
-
       <div className="telemetry-main-grid">
         
         {/* Radio discovery is the primary surface. Live input is available without squeezing it out. */}
@@ -172,6 +164,19 @@ export const MainView: React.FC = () => {
               />
             </div>
           </details>
+          <details style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-panel)', padding: '0.7rem 0.8rem' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+              PRIORITY RADIO QUEUE <span style={{ color: 'var(--text-muted)' }}>— up to 3 clips</span>
+            </summary>
+            <div style={{ marginTop: '0.6rem' }}>
+              <PriorityQueue onClipSelect={handleLibrarySelect} refreshKey={activeData?.clip_id} maxItems={3} />
+            </div>
+          </details>
+          {latestRadio && !activeData && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontFamily: 'var(--font-mono)', padding: '0 0.2rem' }}>
+              LATEST ARCHIVE RADIO · {latestRadio.driver_code} · {new Date(latestRadio.date).toLocaleTimeString()}
+            </p>
+          )}
         </div>
 
         {/* Selected radio detail and matching FastF1 timing */}

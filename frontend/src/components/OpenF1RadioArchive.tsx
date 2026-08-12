@@ -65,6 +65,11 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
+  const retryArchive = () => {
+    setError(null);
+    setRefreshTick((current) => current + 1);
+  };
+
   const meetings = useMemo(() => {
     const byKey = new Map<number, OpenF1Session>();
     sessions.forEach((session) => {
@@ -223,7 +228,13 @@ export const OpenF1RadioArchive: React.FC<OpenF1RadioArchiveProps> = ({ onClipSe
         style={{ ...selectStyle, textTransform: 'uppercase' }}
       />
 
-      {error && <p role="alert" style={{ color: 'var(--mood-frustrated)', fontSize: '0.75rem' }}>{error}</p>}
+      {error && (
+        <div role="alert" style={{ border: '1px solid var(--mood-frustrated)', borderRadius: 'var(--radius-sm)', padding: '0.55rem', color: 'var(--text-secondary)', fontSize: '0.72rem', lineHeight: 1.4 }}>
+          <strong style={{ color: 'var(--text-primary)' }}>ARCHIVE CONNECTION UNAVAILABLE</strong>
+          <p style={{ marginTop: '0.2rem' }}>{error}</p>
+          <button type="button" onClick={retryArchive} style={{ marginTop: '0.45rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-primary)', padding: '0.3rem 0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', cursor: 'pointer' }}>RETRY ARCHIVE</button>
+        </div>
+      )}
 
       <div style={{ height: compact ? 236 : undefined, flex: compact ? '0 0 auto' : 1, minHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingRight: '0.25rem' }}>
         {loadingSessions || loadingRadios ? <LoadingState message={loadingSessions ? 'LOADING OPENF1 ARCHIVE...' : 'TUNING RADIO CHANNEL...'} /> : filteredRadios.length === 0 ? (
