@@ -203,6 +203,15 @@ For full response shapes, see [shared/schema.md](shared/schema.md).
 - Radio is naturally noisy. If acoustic tone cannot be isolated, the UI labels the result as a transcript-derived estimate instead of pretending that it is a voice measurement.
 - Engineers should validate all alerts against radio context, timing, race control, and team procedure.
 
+## Offline Analysis: Emotion vs Performance Correlation
+
+The repository includes `fastf1_join.py`, an offline data processing script designed to merge a dataset of driver radio emotions with FastF1 telemetry. It helps analyze whether a driver's emotional state correlates with a change in performance on incoming laps. 
+
+When run against a labeled dataset, this script:
+1. Maps each radio clip to its exact `lap_number` using the message timestamp and session telemetry.
+2. Extracts the `current_lap_time`, `prev_lap_time`, and `next_lap_time` in total seconds.
+3. Outputs a final CSV dataset (`final_labeled_dataset.csv`) that can be used to run statistical correlation analysis (e.g., determining if a `frustrated` mood directly correlates with a pace drop-off on the subsequent lap).
+
 ## Testing and quality checks
 
 Run frontend checks:

@@ -24,9 +24,62 @@ interface TrackMapProps {
   selectedClipId?: string | null;
 }
 
+const TEAM_COLORS: Record<number, Record<string, string>> = {
+  2023: {
+    'Red Bull Racing': '#3671C6',
+    'Ferrari': '#E8002D',
+    'Mercedes': '#00A19C',
+    'McLaren': '#FF8700',
+    'Alpine': '#FF87BC',
+    'Aston Martin': '#006F62',
+    'Williams': '#005AFF',
+    'AlphaTauri': '#2B4562',
+    'Alfa Romeo': '#C92D4B',
+    'Haas': '#B6BABD'
+  },
+  2024: {
+    'Red Bull Racing': '#3671C6',
+    'Ferrari': '#E8002D',
+    'Mercedes': '#00A19C',
+    'McLaren': '#FF8000',
+    'Alpine': '#FF87BC',
+    'Aston Martin': '#006F62',
+    'Williams': '#005AFF',
+    'RB': '#6692FF',
+    'Stake F1 Team': '#00E701',
+    'Haas': '#B6BABD'
+  },
+  2025: {
+    'McLaren': '#FF8000',
+    'Ferrari': '#E8002D',
+    'Red Bull Racing': '#3671C6',
+    'Mercedes': '#00D2BE',
+    'Aston Martin': '#006F62',
+    'Alpine': '#FF87BC',
+    'Williams': '#1868DB',
+    'Racing Bulls': '#6692FF',
+    'Haas': '#B6BABD',
+    'Kick Sauber': '#00E701'
+  },
+  2026: {
+    'McLaren': '#FF8000',
+    'Ferrari': '#E80020',
+    'Red Bull Racing': '#3671C6',
+    'Mercedes': '#27F4D2',
+    'Aston Martin': '#00665E',
+    'Alpine': '#FF87BC',
+    'Williams': '#1868DB',
+    'Racing Bulls': '#6692FF',
+    'Haas': '#B6BABD',
+    'Audi': '#F50537',
+    'Cadillac': '#C0C0C0'
+  }
+};
+
 export const TrackMap: React.FC<TrackMapProps> = ({ gp, session, driver, year = 2026, selectedLapNumber, selectedMoodLabel, selectedClipId }) => {
   const [points, setPoints] = useState<TrackPoint[]>([]);
   const [corners, setCorners] = useState<CornerMarker[]>([]);
+  const [teamName, setTeamName] = useState<string | null>(null);
   const [clipPoint, setClipPoint] = useState<TrackPoint | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +107,11 @@ export const TrackMap: React.FC<TrackMapProps> = ({ gp, session, driver, year = 
         setPoints(result.track_path);
         if (result.corners) {
           setCorners(result.corners);
+        }
+        if (result.team_name) {
+          setTeamName(result.team_name);
+        } else {
+          setTeamName(null);
         }
       } catch (err: any) {
         setError(err.message);
@@ -284,7 +342,7 @@ export const TrackMap: React.FC<TrackMapProps> = ({ gp, session, driver, year = 
 
             {/* Lap Replay Ghost Car */}
             {selectedLapNumber != null && (
-              <circle r={scaleFactor * 20} fill={getMoodColor(selectedMoodLabel || 'neutral')}>
+              <circle r={scaleFactor * 20} fill={(teamName && TEAM_COLORS[year]?.[teamName]) || getMoodColor(selectedMoodLabel || 'neutral')}>
                 <animateMotion 
                   dur="4s" 
                   repeatCount="indefinite"

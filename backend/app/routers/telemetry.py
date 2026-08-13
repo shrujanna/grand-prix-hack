@@ -24,6 +24,7 @@ class TrackMapResponse(BaseModel):
     session: str
     driver: str
     year: int
+    team_name: Optional[str] = None
     track_path: List[TrackPoint]
     corners: Optional[List[CornerMarker]] = None
 
@@ -75,11 +76,19 @@ def get_track_map(
         except Exception as e:
             print(f"Failed to fetch corners: {e}")
             
+        team_name = None
+        try:
+            driver_info = sess.get_driver(driver)
+            team_name = str(driver_info.get("TeamName")) if "TeamName" in driver_info else None
+        except:
+            pass
+
         return TrackMapResponse(
             gp=gp,
             session=session,
             driver=driver,
             year=year,
+            team_name=team_name,
             track_path=points,
             corners=corners_list
         )
