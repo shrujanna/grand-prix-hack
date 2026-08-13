@@ -68,14 +68,24 @@ export const PriorityQueue: React.FC<PriorityQueueProps> = ({ onClipSelect, refr
               <button type="button" onClick={() => onClipSelect(clip)} style={{ border: 0, background: 'transparent', color: 'var(--text-primary)', textAlign: 'left', cursor: 'pointer', padding: 0 }}>
                 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{done ? '✓ REVIEWED' : '⚑ REVIEW'} · {clip.driver_code} · {label}</strong>
                 <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '0.12rem' }}>
-                  {clip.date ? formatTrackTime(clip.date, clip.gp) : (() => {
-                    const match = clip.clip_id.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-                    if (match) {
-                      const isoStr = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`;
-                      return formatTrackTime(isoStr, clip.gp);
+                  {(() => {
+                    let timeStr = '';
+                    if (clip.date) {
+                      timeStr = formatTrackTime(clip.date, clip.gp);
+                    } else if (clip.uploaded_at) {
+                      timeStr = formatTrackTime(clip.uploaded_at, clip.gp);
+                    } else {
+                      const match = clip.clip_id.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                      if (match) {
+                        const isoStr = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`;
+                        timeStr = formatTrackTime(isoStr, clip.gp);
+                      }
                     }
-                    return '—';
-                  })()} · L{clip.lap_number || '?'}
+                    const parts = [];
+                    if (timeStr) parts.push(timeStr);
+                    if (clip.lap_number) parts.push(`L${clip.lap_number}`);
+                    return parts.length > 0 ? parts.join(' · ') : 'Live Radio';
+                  })()}
                 </span>
                 <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '0.12rem', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{clip.text || 'Transcript pending'}</span>
               </button>

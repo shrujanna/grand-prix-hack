@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Optional, Set
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -14,6 +15,7 @@ from app.services.transcription import (
     TranscriptionConfigurationError,
     transcribe_audio,
 )
+from app.services.audio_denoise import denoise_audio_bytes
 from app.services.openf1 import OpenF1Error, download_team_radio, radio_context
 from app.services.local_archive import LocalArchiveError, read_audio as read_local_audio, radio_context as local_radio_context
 from app.services.signal_assessment import derive_mood, screen_fatigue_cues
@@ -75,12 +77,19 @@ async def analyze_audio_bytes(
     session: Optional[str] = None,
     lap_number: Optional[float] = None,
     save_clip: bool = True,
+    use_denoiser: bool = False,
 ):
     """Run the shared analysis workflow for an uploaded or OpenF1 radio file."""
     try:
         duration = validate_audio_upload(audio_bytes, content_type, filename)
     except AudioValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+    if use_denoiser:
+        try:
+            audio_bytes = denoise_audio_bytes(audio_bytes)
+        except Exception as error:
+            logger.warning("denoise_audio_failed error_type=%s, falling back to original", type(error).__name__)
 
     requested = _requested_services(retry_services)
     transcript = transcript.strip() if transcript and transcript.strip() else None
@@ -222,11 +231,12 @@ async def analyze_clip(
     session: Optional[str] = Form(None),
     lap_number: Optional[float] = Form(None),
     save_clip: bool = Form(True),
+    use_denoiser: bool = Form(False),
 ):
     """Analyze an audio clip uploaded by the operator."""
     return await analyze_audio_bytes(
         await audio.read(), audio.content_type, audio.filename, transcript, retry_services,
-        driver_code, driver_name, gp, session, lap_number, save_clip,
+        driver_code, driver_name, gp, session, lap_number, save_clip, use_denoiser
     )
 
 
@@ -236,6 +246,7 @@ async def analyze_openf1_radio(
     driver_number: int = Form(...),
     date: str = Form(...),
     lap_number: Optional[float] = Form(None),
+    use_denoiser: bool = Form(False),
 ):
     """Analyze a public OpenF1 recording while preserving its race metadata."""
     try:
@@ -249,27 +260,45 @@ async def analyze_openf1_radio(
     result = await analyze_audio_bytes(
         audio_bytes=audio_bytes,
         content_type=content_type,
-        filename=recording_url.rsplit("/", 1)[-1] or "team-radio.mp3",
+        filename=f"{session_key}_{driver_number}_{date}.mp3",
         driver_code=context["driver_code"],
         driver_name=context["driver_name"],
         gp=context["gp"],
         session=context["session"],
-        lap_number=lap_number,
-        save_clip=True,
+        lap_number=lap_number if lap_number is not None else context["lap_number"],
+        save_clip=False,
+        use_denoiser=use_denoiser
     )
-    result.year = context.get("year")
+    result.audio_url = recording_url
+    result.source = "openf1"
     return result
 
 
 @router.post("/local-archive", response_model=AnalyzeResponse)
-async def analyze_local_archive_radio(clip_id: str = Form(...), lap_number: Optional[float] = Form(None)):
-    """Analyze a selected local MP3 with the existing Hugging Face workflow."""
+async def analyze_local_archive_radio(
+    clip_id: str = Form(...),
+    lap_number: Optional[float] = Form(None),
+    use_denoiser: bool = Form(False),
+):
+    """Analyze a clip from the local 2026 archive."""
     try:
-        context = await asyncio.to_thread(local_radio_context, clip_id)
         audio_bytes, content_type, record = await asyncio.to_thread(read_local_audio, clip_id)
+        context = await asyncio.to_thread(local_radio_context, clip_id)
     except LocalArchiveError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    result = await analyze_audio_bytes(audio_bytes, content_type, record["audio_filename"], driver_code=context["driver_code"], driver_name=context["driver_name"], gp=context["gp"], session=context["session"], lap_number=lap_number if lap_number is not None else context["lap_number"], save_clip=False)
+
+    result = await analyze_audio_bytes(
+        audio_bytes,
+        content_type,
+        record["audio_filename"],
+        driver_code=context["driver_code"],
+        driver_name=context["driver_name"],
+        gp=context["gp"],
+        session=context["session"],
+        lap_number=lap_number if lap_number is not None else context["lap_number"],
+        save_clip=False,
+        use_denoiser=use_denoiser
+    )
     result.clip_id, result.audio_url, result.source, result.year = context["clip_id"], context["audio_url"], "local", 2026
     result.gp, result.session, result.driver_code, result.driver_name = context["gp"], context["session"], context["driver_code"], context["driver_name"]
     return result

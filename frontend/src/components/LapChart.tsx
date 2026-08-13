@@ -47,12 +47,15 @@ export const LapChart: React.FC<LapChartProps> = ({ gp, session, driver, year = 
       setError(null);
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-        const url = `${baseUrl}/api/laps?gp=${encodeURIComponent(gp)}&session=${encodeURIComponent(session)}&driver=${encodeURIComponent(driver)}&year=${year}`;
+        const url = `${baseUrl}/api/laps?gp=${encodeURIComponent(gp)}&session=${encodeURIComponent(session)}&driver=${encodeURIComponent(driver)}&year=${year || 2026}`;
         
         const response = await fetch(url);
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          throw new Error(payload?.detail || 'FastF1 lap timing is unavailable for this selection.');
+          const detail = Array.isArray(payload?.detail) 
+            ? `Validation error: ${payload.detail[0]?.msg}` 
+            : (typeof payload?.detail === 'string' ? payload.detail : 'FastF1 lap timing is unavailable for this selection.');
+          throw new Error(detail);
         }
         
         const result = await response.json();

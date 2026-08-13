@@ -7,3 +7,9 @@ requests>=2.31.0
 mutagen>=1.47.0
 pandas>=2.0.0
 fastf1>=3.4.0
+
+torch>=2.0.0
+torchaudio>=2.0.0
+speechbrain>=1.1.0
+torchcodec>=0.15.0
+soundfile>=0.14.0

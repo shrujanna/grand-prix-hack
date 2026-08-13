@@ -11,10 +11,10 @@ import { formatTrackTime } from '../utils/timeUtils';
 import '../theme/index.css';
 
 export const MainView: React.FC = () => {
-  // State for the currently active data to display on the right
   const [activeData, setActiveData] = useState<any | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzingArchiveRadio, setAnalyzingArchiveRadio] = useState(false);
+  const [useDenoiser, setUseDenoiser] = useState(false);
   
   const [showAiInsight, setShowAiInsight] = useState(false);
   const [isLiveUpload, setIsLiveUpload] = useState(false);
@@ -79,6 +79,7 @@ export const MainView: React.FC = () => {
         form.set('date', activeData.date);
       }
       if (activeData.lap_number != null) form.set('lap_number', String(activeData.lap_number));
+      if (useDenoiser) form.set('use_denoiser', 'true');
       const response = await fetch(`${baseUrl}${isLocal ? '/api/analyze/local-archive' : '/api/analyze/openf1'}`, { method: 'POST', body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this team radio.');
@@ -227,14 +228,25 @@ export const MainView: React.FC = () => {
                   <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" onTimeUpdate={setPlaybackTime} />
                 )}
                 {['openf1', 'local'].includes(activeData.source) && (
-                  <button
-                    type="button"
-                    onClick={analyzeSelectedArchiveRadio}
-                    disabled={analyzingArchiveRadio}
-                    style={{ marginTop: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
-                  >
-                    {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
-                  </button>
+                  <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={useDenoiser}
+                        onChange={(e) => setUseDenoiser(e.target.checked)}
+                        style={{ accentColor: 'var(--accent-f1)' }}
+                      />
+                      USE AI DENOISER (SPEECHBRAIN)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={analyzeSelectedArchiveRadio}
+                      disabled={analyzingArchiveRadio}
+                      style={{ padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                    >
+                      {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
+                    </button>
+                  </div>
                 )}
               </div>
 

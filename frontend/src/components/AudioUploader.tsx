@@ -141,6 +141,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState<string | null>(null);
+  const [useDenoiser, setUseDenoiser] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -212,6 +213,9 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
 
   const analyzeFile = async (file: File, retryServices?: ServiceName[], saveClip = true) => {
     try {
+      if (!retryServices && context.driverCode.trim().length !== 3) {
+        throw new Error('Please enter a 3-letter driver code (e.g., HAM, VER) before analyzing.');
+      }
       validateFile(file);
       const lapTimes = parseLapTimes(context.lapTimes);
       setIsProcessing(true);
@@ -229,6 +233,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
       formData.append('audio', file);
       appendContext(formData);
       formData.append('save_clip', String(saveClip && !retryServices));
+      if (useDenoiser) formData.append('use_denoiser', 'true');
       if (retryServices?.length) {
         formData.append('retry_services', retryServices.join(','));
         if (analysis?.transcript && !retryServices.includes('transcription')) {
@@ -289,6 +294,10 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
   const stopRecording = () => recorderRef.current?.state === 'recording' && recorderRef.current.stop();
 
   const startRecording = async () => {
+    if (context.driverCode.trim().length !== 3) {
+      onError('Please enter a 3-letter driver code (e.g., HAM, VER) before recording.');
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       onError('This browser does not support microphone recording. Upload an audio clip instead.');
       return;
@@ -367,6 +376,17 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ onAnalysisComplete
         <p style={{ fontFamily: 'var(--font-mono)', color: isDragging ? 'var(--accent-f1)' : 'var(--text-secondary)' }}>
           {isDragging ? 'DROP TO UPLOAD' : 'DRAG AUDIO CLIP HERE OR CLICK TO BROWSE'}
         </p>
+        <div style={{ marginTop: '1rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={useDenoiser}
+              onChange={(e) => setUseDenoiser(e.target.checked)}
+              style={{ accentColor: 'var(--accent-f1)' }}
+            />
+            USE AI DENOISER (SPEECHBRAIN)
+          </label>
+        </div>
         <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>MP3, WAV, M4A, AAC, OGG, OPUS, FLAC, or WebM · 20 MB max</p>
       </div>
 
