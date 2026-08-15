@@ -16,11 +16,14 @@ interface MoodDisplayProps {
   audioFallback?: boolean;
   moodLabel?: string | null;
   moodConfidence?: number | null;
+  moodIntensity?: number | null;
   moodSource?: string | null;
   fatigueLabel?: string | null;
   fatigueConfidence?: number | null;
   fatigueEvidence?: string[] | null;
   fatigueStatus?: string | null;
+  onEditTranscript?: (newTranscript: string) => void;
+  onEditMood?: (newMood: string, newIntensity: number) => void;
 }
 
 export const MoodDisplay: React.FC<MoodDisplayProps> = ({
@@ -37,12 +40,26 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
   audioFallback,
   moodLabel,
   moodConfidence,
+  moodIntensity,
   moodSource,
   fatigueLabel,
   fatigueConfidence,
   fatigueEvidence,
   fatigueStatus,
+  onEditTranscript,
+  onEditMood,
 }) => {
+  const [isEditingTranscript, setIsEditingTranscript] = React.useState(false);
+  const [editedTranscript, setEditedTranscript] = React.useState(transcript || '');
+  const [isEditingMood, setIsEditingMood] = React.useState(false);
+  const [editedMood, setEditedMood] = React.useState(moodLabel || 'unknown');
+  const [editedIntensity, setEditedIntensity] = React.useState(moodIntensity || (moodConfidence ? Math.max(1, Math.round(moodConfidence * 5)) : 3));
+
+  React.useEffect(() => {
+    setEditedTranscript(transcript || '');
+    setEditedMood(moodLabel || 'unknown');
+    setEditedIntensity(moodIntensity || (moodConfidence ? Math.max(1, Math.round(moodConfidence * 5)) : 3));
+  }, [transcript, moodLabel, moodConfidence, moodIntensity]);
   // Derive a rough 1-5 intensity for audio based on confidence (0-1) so it visually matches the text intensity badge
   const derivedAudioIntensity = audioConfidence 
     ? Math.max(1, Math.min(5, Math.round(audioConfidence * 5))) 
@@ -86,116 +103,128 @@ export const MoodDisplay: React.FC<MoodDisplayProps> = ({
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             marginBottom: '0.75rem',
-            fontFamily: 'var(--font-mono)'
+            fontFamily: 'var(--font-mono)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.5rem'
           }}>
             Transcript
+            {onEditTranscript && !isEditingTranscript && (
+              <button onClick={() => setIsEditingTranscript(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: 'var(--mood-frustrated)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }} title="Edit Transcript">
+                EDIT
+              </button>
+            )}
           </h3>
-          <p style={{ 
-            fontSize: '1.125rem', 
-            lineHeight: 1.6, 
-            color: 'var(--text-primary)',
-            fontStyle: transcript?.includes('REQUIRED') ? 'italic' : 'normal',
-            opacity: transcript?.includes('REQUIRED') ? 0.7 : 1
-          }}>
-            {renderTranscript()}
-          </p>
+          {isEditingTranscript ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <textarea 
+                value={editedTranscript}
+                onChange={e => setEditedTranscript(e.target.value)}
+                style={{ width: '100%', minHeight: '80px', padding: '0.5rem', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', borderRadius: '4px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', textAlign: 'center' }}
+              />
+              <button 
+                onClick={() => { onEditTranscript?.(editedTranscript); setIsEditingTranscript(false); }}
+                style={{ padding: '0.4rem 1rem', background: 'var(--accent-f1)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', textTransform: 'uppercase' }}
+              >
+                Save Transcript
+              </button>
+            </div>
+          ) : (
+            <p style={{ 
+              fontSize: '1.125rem', 
+              lineHeight: 1.6, 
+              color: 'var(--text-primary)',
+              fontStyle: transcript?.includes('REQUIRED') ? 'italic' : 'normal',
+              opacity: transcript?.includes('REQUIRED') ? 0.7 : 1,
+              textAlign: 'center'
+            }}>
+              {renderTranscript()}
+            </p>
+          )}
         </div>
 
         <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)' }} />
-
-        {(transcriptionStatus || audioStatus || textStatus) && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            {transcriptionStatus && <span>TEXT: {transcriptionStatus.replace('_', ' ').toUpperCase()}</span>}
-            {audioStatus && <span>VOICE: {audioStatus.replace('_', ' ').toUpperCase()}</span>}
-            {textStatus && <span>SENTIMENT: {textStatus.replace('_', ' ').toUpperCase()}</span>}
-          </div>
-        )}
 
         {/* Emotion Signals Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
           
-          {/* Audio Signal */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <span style={{ 
-              fontSize: '0.75rem', 
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)'
-            }}>
-              {audioFallback ? 'NOISY-RADIO FALLBACK' : 'AUDIO VIBRATION SIGNAL'}
-            </span>
-            <div>
+          {/* Text Signal */}
+          <span style={{ 
+            fontSize: '0.75rem', 
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)'
+          }}>
+            NLP TEXT SENTIMENT
+          </span>
+          <div>
+            {textLabel ? (
               <MoodBadge 
-                mood={audioLabel as any} 
-                intensity={derivedAudioIntensity} 
+                mood={textLabel as any} 
+                intensity={textIntensity} 
                 size="md" 
               />
-            </div>
-            {audioConfidence && (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Confidence: {(audioConfidence * 100).toFixed(1)}%
+            ) : (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                No text sentiment data
               </span>
             )}
-            {audioFallback && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated from the transcript because noise blocked a reliable acoustic read.</span>}
-          </div>
-
-          {/* Text Signal */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <span style={{ 
-              fontSize: '0.75rem', 
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)'
-            }}>
-              NLP TEXT SENTIMENT
-            </span>
-            <div>
-              {textLabel ? (
-                <MoodBadge 
-                  mood={textLabel as any} 
-                  intensity={textIntensity} 
-                  size="md" 
-                />
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                  No text sentiment data
-                </span>
-              )}
-            </div>
           </div>
 
         </div>
 
         <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)' }} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>OPERATOR MOOD SIGNAL</span>
-            {moodLabel && moodLabel !== 'unknown' ? (
-              <>
-                <MoodBadge mood={moodLabel as any} intensity={moodConfidence ? Math.max(1, Math.round(moodConfidence * 5)) : undefined} size="md" />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {moodSource === 'combined' ? 'Voice + transcript' : moodSource === 'voice' ? 'Voice signal' : 'Transcript signal'}
-                  {moodConfidence ? ` · ${(moodConfidence * 100).toFixed(0)}% confidence` : ''}
-                </span>
-              </>
-            ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No reliable mood signal</span>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>MOOD SIGNAL</span>
+            {onEditMood && !isEditingMood && (
+              <button onClick={() => setIsEditingMood(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: 'var(--mood-frustrated)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }} title="Edit Mood">
+                EDIT
+              </button>
+            )}
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>FATIGUE CUE SCREEN</span>
-            {fatigueStatus === 'screened' ? (
-              <>
-                <span style={{ display: 'inline-flex', alignSelf: 'flex-start', borderRadius: 'var(--radius-full)', border: `1px solid ${fatigueLabel === 'high' ? 'var(--mood-frustrated)' : fatigueLabel === 'watch' ? '#f5a623' : 'var(--border-subtle)'}`, color: fatigueLabel === 'high' ? 'var(--mood-frustrated)' : fatigueLabel === 'watch' ? '#f5a623' : 'var(--text-secondary)', padding: '4px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', textTransform: 'uppercase' }}>
-                  {fatigueLabel === 'high' ? 'Check driver' : fatigueLabel === 'watch' ? 'Watch cues' : 'No cue found'}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {fatigueEvidence?.length ? fatigueEvidence.join(' · ') : 'No explicit tiredness or focus cue in the transcript.'}
-                  {fatigueConfidence ? ` · ${(fatigueConfidence * 100).toFixed(0)}% cue strength` : ''}
-                </span>
-              </>
-            ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Transcript required</span>}
-          </div>
+          {isEditingMood ? (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select 
+                value={editedMood}
+                onChange={e => setEditedMood(e.target.value)}
+                style={{ background: 'var(--bg-app)', color: 'white', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+              >
+                <option value="unknown">Unknown</option>
+                <option value="neutral">Neutral</option>
+                <option value="frustrated">Frustrated</option>
+                <option value="happy">Happy</option>
+                <option value="dejected">Dejected</option>
+              </select>
+              <select
+                value={editedIntensity}
+                onChange={e => setEditedIntensity(parseInt(e.target.value))}
+                style={{ background: 'var(--bg-app)', color: 'white', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+              >
+                <option value={1}>Lvl 1</option>
+                <option value={2}>Lvl 2</option>
+                <option value={3}>Lvl 3</option>
+                <option value={4}>Lvl 4</option>
+                <option value={5}>Lvl 5</option>
+              </select>
+              <button 
+                onClick={() => { onEditMood?.(editedMood, editedIntensity); setIsEditingMood(false); }}
+                style={{ padding: '0.3rem 0.6rem', background: 'var(--accent-f1)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', textTransform: 'uppercase' }}
+              >
+                Save
+              </button>
+            </div>
+          ) : moodLabel && moodLabel !== 'unknown' ? (
+            <>
+              <MoodBadge mood={moodLabel as any} intensity={moodIntensity || (moodConfidence ? Math.max(1, Math.round(moodConfidence * 5)) : undefined)} size="md" />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {moodSource === 'combined' ? 'Voice + transcript' : moodSource === 'voice' ? 'Voice signal' : 'Transcript signal'}
+                {moodConfidence ? ` · ${(moodConfidence * 100).toFixed(0)}% confidence` : ''}
+              </span>
+            </>
+          ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No reliable mood signal</span>}
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', lineHeight: 1.45 }}>Fatigue is a transcript cue screen, not a medical assessment. Confirm any concern with the driver and team protocol.</p>
       </div>
     </Card>
   );

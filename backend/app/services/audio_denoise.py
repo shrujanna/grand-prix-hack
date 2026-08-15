@@ -28,7 +28,6 @@ def get_denoiser_model():
             raise
     return _model
 
-
 def denoise_audio_bytes(audio_bytes: bytes) -> bytes:
     """
     Takes raw audio bytes, runs them through the SpeechBrain MetricGAN+ denoiser,

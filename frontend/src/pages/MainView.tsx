@@ -5,7 +5,7 @@ import { MoodDisplay } from '../components/MoodDisplay';
 import { LapChart } from '../components/LapChart';
 import { TrackMap } from '../components/TrackMap';
 import { AudioPlayback } from '../components/AudioPlayback';
-import { PriorityQueue } from '../components/PriorityQueue';
+import { AiControlCenter } from '../components/AiControlCenter';
 import { Card } from '../components/ui/Card';
 import { formatTrackTime } from '../utils/timeUtils';
 import '../theme/index.css';
@@ -21,6 +21,8 @@ export const MainView: React.FC = () => {
   const [selectedLapInsight, setSelectedLapInsight] = useState<any | null>(null);
   const [latestRadio, setLatestRadio] = useState<any | null>(null);
   const [playbackTime, setPlaybackTime] = useState<number | null>(null);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [highlightAdminPanel, setHighlightAdminPanel] = useState(false);
 
   const handleLibrarySelect = (clip: any) => {
     setIsLiveUpload(false);
@@ -187,12 +189,23 @@ export const MainView: React.FC = () => {
               />
             </div>
           </details>
-          <details style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-panel)', padding: '0.7rem 0.8rem' }}>
+          <details 
+            open={isAdminPanelOpen}
+            onToggle={(e) => setIsAdminPanelOpen(e.currentTarget.open)}
+            style={{ 
+              border: highlightAdminPanel ? '1px solid var(--accent-f1)' : '1px solid var(--border-subtle)', 
+              borderRadius: 'var(--radius-lg)', 
+              background: 'var(--bg-panel)', 
+              padding: '0.7rem 0.8rem',
+              transition: 'border 0.3s ease, box-shadow 0.3s ease',
+              boxShadow: highlightAdminPanel ? '0 0 15px rgba(255, 51, 51, 0.4)' : 'none'
+            }}
+          >
             <summary style={{ cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-              PRIORITY RADIO QUEUE <span style={{ color: 'var(--text-muted)' }}>— up to 3 clips</span>
+              AI TRAINING STUDIO (ADMIN) <span style={{ color: 'var(--text-muted)' }}>— correct AI and retrain</span>
             </summary>
             <div style={{ marginTop: '0.6rem' }}>
-              <PriorityQueue onClipSelect={handleLibrarySelect} refreshKey={activeData?.clip_id} maxItems={3} />
+              <AiControlCenter activeData={activeData} onUpdateActiveData={setActiveData} />
             </div>
           </details>
           {latestRadio && !activeData && (
@@ -222,11 +235,24 @@ export const MainView: React.FC = () => {
                   audioFallback={activeData.audio_fallback}
                   moodLabel={activeData.mood_label}
                   moodConfidence={activeData.mood_confidence}
+                  moodIntensity={activeData.human_label_intensity}
                   moodSource={activeData.mood_source}
                   fatigueLabel={activeData.fatigue_label}
                   fatigueConfidence={activeData.fatigue_confidence}
                   fatigueEvidence={activeData.fatigue_evidence}
                   fatigueStatus={activeData.fatigue_status}
+                  onEditTranscript={(newTranscript) => { 
+                    setActiveData({...activeData, transcript: newTranscript, chunks: null}); 
+                    setIsAdminPanelOpen(true);
+                    setHighlightAdminPanel(true);
+                    setTimeout(() => setHighlightAdminPanel(false), 2500);
+                  }}
+                  onEditMood={(newMood, newIntensity) => { 
+                    setActiveData({...activeData, mood_label: newMood, human_label: newMood, text_model_intensity: newIntensity, human_label_intensity: newIntensity}); 
+                    setIsAdminPanelOpen(true);
+                    setHighlightAdminPanel(true);
+                    setTimeout(() => setHighlightAdminPanel(false), 2500);
+                  }}
                 />
                 {activeData.audio_url && (
                   <AudioPlayback audioUrl={activeData.audio_url} title="Selected team radio" onTimeUpdate={setPlaybackTime} />
@@ -250,14 +276,6 @@ export const MainView: React.FC = () => {
                         style={{ flex: 1, padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
                       >
                         {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={saveToDataset}
-                        title="Instantly save the current analysis displayed above into the training dataset without re-running models."
-                        style={{ padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mood-frustrated)', background: 'transparent', color: 'var(--mood-frustrated)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
-                      >
-                        SAVE CURRENT TO DATASET (OVERWRITE)
                       </button>
                     </div>
                   </div>
