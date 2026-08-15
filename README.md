@@ -55,12 +55,19 @@ Here is a detailed breakdown of the exact models driving the pipeline:
 - **Role:** Converts raw text into a numerical matrix of TF-IDF features (Term Frequency-Inverse Document Frequency) via `scikit-learn`.
 - **Why this model:** Instead of just counting words, TF-IDF evaluates how important a word is to a specific document within the entire corpus. In F1, words like "tyres" appear constantly, so they hold less predictive weight. But rare, highly specific jargon like "box", "strat", or "retire" are given much higher mathematical significance, allowing the downstream classifier to pick up on critical signals immediately.
 
-### 3. Multinomial Naive Bayes (`MultinomialNB`) (The Core Sentiment Engine)
-- **Role:** The brain of the HITL operation. It classifies the vectorized text into specific mood labels (Happy, Neutral, Frustrated, Dejected).
+### 3. The Sentiment Engine (Dual-Model Architecture)
+The brain of the HITL operation uses an elegant "Cold-Start vs. Warm-Start" architecture:
+
+**A. The Cold-Start Bootstrap (Hugging Face DistilRoBERTa)**
+- **Role:** When the system is first booted up (or doesn't have enough human-labeled data yet), it pings an external Hugging Face LLM (`j-hartmann/emotion-english-distilroberta-base`) to generate baseline zero-shot predictions. 
+- **Why:** This ensures the dashboard works out of the box on day one without needing thousands of hours of manual F1 labeling.
+
+**B. The Warm-Start Local Flywheel (Multinomial Naive Bayes)**
+- **Role:** As soon as the Race Engineer starts correcting the DistilRoBERTa predictions in the AI Training Studio, the local Naive Bayes model kicks in and takes over.
 - **Why this model? Speed and Adaptability.** 
-  - **The Problem:** Modern LLMs (like GPT-4 or LLaMA) or Transformers (like BERT) require massive computational resources and significant time to fine-tune. During a live F1 race, a Race Engineer does not have 3 hours to wait for an LLM to re-train on a new piece of driver jargon.
-  - **The Solution:** A Multinomial Naive Bayes text classifier can be retrained from scratch on hundreds or thousands of labeled F1 radio clips in literally *milliseconds*. 
-- **The Result:** The moment the engineer clicks "Retrain Local Model", the Naive Bayes model discards its old weights, completely retrains on the updated `final_labeled_dataset.csv`, and is ready for inference on the very next radio clip—all locally, offline, and instantaneously. This is what makes the Continuous Learning Flywheel possible.
+  - **The Problem:** Modern Transformers (like BERT or RoBERTa) require massive computational resources and significant time to fine-tune. During a live F1 race, an engineer cannot wait 3 hours for a model to re-train on a new piece of driver jargon.
+  - **The Solution:** The local Naive Bayes text classifier can be retrained from scratch on hundreds of labeled F1 radio clips in literally *milliseconds*. 
+- **The Result:** The moment the engineer clicks "Retrain Local Model", the Naive Bayes model discards its old weights and completely retrains on the updated dataset. From that second forward, it intercepts the transcript *before* it hits Hugging Face, analyzing the sentiment instantly, locally, and offline. This is what makes the Continuous Learning Flywheel possible.
 
 ---
 
