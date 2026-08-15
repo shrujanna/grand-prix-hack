@@ -40,15 +40,27 @@ To solve this, we built a **Human-In-The-Loop (HITL)** system:
 
 ---
 
-## ⚡ The Custom Machine Learning Architecture
+## ⚡ The Machine Learning Models Used
 
-To achieve **instant retraining** without requiring massive GPU clusters or waiting hours for a heavy LLM to fine-tune, we implemented a highly optimized, lightweight text classification architecture:
+To achieve **instant retraining** without requiring massive GPU clusters or waiting hours for a heavy LLM to fine-tune, we abandoned bloated Transformer models in favor of a highly optimized, lightning-fast text classification architecture.
 
-1. **Transcription Layer:** Uses OpenAI's Whisper for high-fidelity speech-to-text.
-2. **Local Sentiment Engine:** The brain of the operation is powered by a **Multinomial Naive Bayes (`MultinomialNB`)** classifier coupled with a **TF-IDF Vectorizer** (Term Frequency-Inverse Document Frequency) using `scikit-learn`.
-   - **Why this model?** Speed and adaptability. A Naive Bayes text classifier can retrain on hundreds or thousands of labeled F1 radio clips in *milliseconds*. 
-   - **How it works:** It maps the mathematical frequency of words (including newly learned F1 jargon like "box box" or "strat 5") directly to the corrected human labels. 
-   - **The Result:** The moment the engineer clicks retrain, the model's weights are completely updated locally. The very next radio clip that comes in will be analyzed using the newly acquired knowledge, entirely offline.
+Here is a detailed breakdown of the exact models driving the pipeline:
+
+### 1. OpenAI Whisper (Transcription Layer)
+- **Role:** High-fidelity Speech-to-Text (STT).
+- **Why this model:** Formula 1 radios are notorious for terrible audio quality. We are dealing with 15,000 RPM engine noise, wind shear, helmet muffling, and radio static. Whisper is the industry standard for robust transcription in noisy environments and handles heavy accents (e.g., Yuki Tsunoda, Max Verstappen) exceptionally well.
+- **Implementation:** Handles the initial decoding of the raw `.mp3` audio files scraped from the live timing feeds into raw text.
+
+### 2. TF-IDF Vectorizer (Feature Extraction)
+- **Role:** Converts raw text into a numerical matrix of TF-IDF features (Term Frequency-Inverse Document Frequency) via `scikit-learn`.
+- **Why this model:** Instead of just counting words, TF-IDF evaluates how important a word is to a specific document within the entire corpus. In F1, words like "tyres" appear constantly, so they hold less predictive weight. But rare, highly specific jargon like "box", "strat", or "retire" are given much higher mathematical significance, allowing the downstream classifier to pick up on critical signals immediately.
+
+### 3. Multinomial Naive Bayes (`MultinomialNB`) (The Core Sentiment Engine)
+- **Role:** The brain of the HITL operation. It classifies the vectorized text into specific mood labels (Happy, Neutral, Frustrated, Dejected).
+- **Why this model? Speed and Adaptability.** 
+  - **The Problem:** Modern LLMs (like GPT-4 or LLaMA) or Transformers (like BERT) require massive computational resources and significant time to fine-tune. During a live F1 race, a Race Engineer does not have 3 hours to wait for an LLM to re-train on a new piece of driver jargon.
+  - **The Solution:** A Multinomial Naive Bayes text classifier can be retrained from scratch on hundreds or thousands of labeled F1 radio clips in literally *milliseconds*. 
+- **The Result:** The moment the engineer clicks "Retrain Local Model", the Naive Bayes model discards its old weights, completely retrains on the updated `final_labeled_dataset.csv`, and is ready for inference on the very next radio clip—all locally, offline, and instantaneously. This is what makes the Continuous Learning Flywheel possible.
 
 ---
 
