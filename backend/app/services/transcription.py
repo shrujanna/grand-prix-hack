@@ -80,21 +80,20 @@ def transcribe_audio(audio_bytes: bytes, content_type: Optional[str] = None) -> 
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
+        "Content-Type": content_type or "audio/wav",
     }
-    
-    payload = {
-        "inputs": base64.b64encode(audio_bytes).decode("utf-8"),
-        "parameters": {"return_timestamps": "word"}
-    }
+
+    # HF Inference API for Whisper changed to prefer binary upload
+    # over base64-encoded JSON which now throws "File name too long" errors.
+    request_url = f"{api_url}?return_timestamps=word"
 
     response = None
     for attempt in range(max_retries + 1):
         try:
             response = requests.post(
-                api_url,
+                request_url,
                 headers=headers,
-                json=payload,
+                data=audio_bytes,
                 timeout=timeout,
             )
         except requests.RequestException as exc:

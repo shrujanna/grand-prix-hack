@@ -54,6 +54,8 @@ def _service_error(service: str, error: Exception) -> tuple[str, str]:
         return "unavailable", "Configure HF_TOKEN or HF_API_KEY, then retry this analysis."
     if isinstance(error, NoSpeechDetectedError):
         return "no_speech", "No intelligible speech was detected. Try a clearer radio clip."
+    if "402" in error_text:
+        return "unavailable", "Hugging Face API credits have been depleted. Please check your account or update your HF_TOKEN."
     if "429" in error_text:
         return "unavailable", "The analysis provider is busy. Please retry in a moment."
     if "502" in error_text or "503" in error_text or "504" in error_text:
