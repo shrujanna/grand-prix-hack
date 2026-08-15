@@ -10,6 +10,7 @@ from app.services.audio_emotion import classify_audio_emotion
 from app.services.audio_validation import AudioValidationError, validate_audio_upload
 from app.services.live_clips import save_live_clip
 from app.services.text_sentiment import classify_text_sentiment
+from app.services.dataset_appender import append_to_dataset
 from app.services.transcription import (
     NoSpeechDetectedError,
     TranscriptionConfigurationError,
@@ -216,6 +217,7 @@ async def analyze_audio_bytes(
                 source="live",
                 uploaded_at=clip.uploaded_at,
             )
+            asyncio.create_task(asyncio.to_thread(append_to_dataset, clip, response))
         except Exception as error:
             logger.exception("live_clip_save_failed error_type=%s", type(error).__name__)
 
@@ -273,6 +275,8 @@ async def analyze_openf1_radio(
     )
     result.audio_url = recording_url
     result.source = "openf1"
+    result.clip_id = f"{session_key}_{driver_number}_{date}"
+    asyncio.create_task(asyncio.to_thread(append_to_dataset, result))
     return result
 
 

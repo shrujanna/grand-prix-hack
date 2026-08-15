@@ -103,20 +103,7 @@ export const MainView: React.FC = () => {
       gap: '1.25rem'
     }}>
       
-      {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            <span style={{ color: 'var(--accent-f1)', marginRight: '12px' }}>|</span>
-            <span className="live-gradient-text">
-              Radio Talk
-            </span>
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', marginTop: '4px' }}>
-            AUDIO VIBRATION & NLP SENTIMENT ANALYSIS
-          </p>
-        </div>
-      </header>
+
 
       {activeData && (
         <Card variant="glass" style={{ padding: '0.85rem 1rem' }}>
