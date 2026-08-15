@@ -251,6 +251,7 @@ async def analyze_openf1_radio(
     date: str = Form(...),
     lap_number: Optional[float] = Form(None),
     use_denoiser: bool = Form(False),
+    overwrite: bool = Form(False),
 ):
     """Analyze a public OpenF1 recording while preserving its race metadata."""
     try:
@@ -276,7 +277,7 @@ async def analyze_openf1_radio(
     result.audio_url = recording_url
     result.source = "openf1"
     result.clip_id = f"{session_key}_{driver_number}_{date}"
-    asyncio.create_task(asyncio.to_thread(append_to_dataset, result))
+    asyncio.create_task(asyncio.to_thread(append_to_dataset, result, None, overwrite))
     return result
 
 
@@ -285,6 +286,7 @@ async def analyze_local_archive_radio(
     clip_id: str = Form(...),
     lap_number: Optional[float] = Form(None),
     use_denoiser: bool = Form(False),
+    overwrite: bool = Form(False),
 ):
     """Analyze a clip from the local 2026 archive."""
     try:
@@ -307,7 +309,14 @@ async def analyze_local_archive_radio(
     )
     result.clip_id, result.audio_url, result.source, result.year = context["clip_id"], context["audio_url"], "local", 2026
     result.gp, result.session, result.driver_code, result.driver_name = context["gp"], context["session"], context["driver_code"], context["driver_name"]
+    asyncio.create_task(asyncio.to_thread(append_to_dataset, result, None, overwrite))
     return result
+
+@router.post("/save-to-dataset")
+async def save_to_dataset(result: AnalyzeResponse, overwrite: bool = True):
+    """Instantly save or overwrite an already-analyzed clip into the dataset."""
+    asyncio.create_task(asyncio.to_thread(append_to_dataset, result, None, overwrite))
+    return {"status": "success"}
 
 from app.models.schemas import PerformanceAnalysisRequest, PerformanceAnalysisResponse
 

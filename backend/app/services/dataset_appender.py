@@ -11,10 +11,10 @@ DEFAULT_DATA_FILE_PATH = os.path.join(
     "final_labeled_dataset.csv"
 )
 
-def append_to_dataset(clip, response: Optional[Dict[str, Any]] = None):
+def append_to_dataset(clip, response: Optional[Dict[str, Any]] = None, overwrite: bool = False):
     """
     Appends an analyzed clip to the final labeled dataset CSV.
-    Checks for duplicates before appending.
+    Checks for duplicates before appending. Overwrites if overwrite=True.
     """
     csv_path = os.getenv("DATA_FILE_PATH", DEFAULT_DATA_FILE_PATH)
     
@@ -32,15 +32,16 @@ def append_to_dataset(clip, response: Optional[Dict[str, Any]] = None):
 
     try:
         # Check if clip_id already exists
+        existing_rows = []
+        found_index = -1
+        
         with open(csv_path, mode="r", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            headers = next(reader, None)
-            if headers:
-                clip_id_index = headers.index("clip_id") if "clip_id" in headers else 0
-                for r in reader:
-                    if len(r) > clip_id_index and r[clip_id_index] == clip_id:
-                        logger.info(f"Clip {clip_id} already exists in dataset. Skipping.")
-                        return
+            reader = list(csv.DictReader(f))
+            for i, r in enumerate(reader):
+                if r.get("clip_id") == clip_id:
+                    found_index = i
+                    break
+            existing_rows = reader
 
         if response is None:
             # If no separate response dict is provided, extract from clip (AnalyzeResponse object)
@@ -81,10 +82,22 @@ def append_to_dataset(clip, response: Optional[Dict[str, Any]] = None):
             "lap_number", "lap_is_ambiguous", "audio_url"
         ]
 
-        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writerow(row)
+        if found_index != -1:
+            if not overwrite:
+                logger.info(f"Clip {clip_id} already exists in dataset. Skipping (overwrite=False).")
+                return
             
-        logger.info(f"Successfully appended clip {clip_id} to {csv_path}")
+            # Overwrite existing row
+            existing_rows[found_index] = row
+            with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(existing_rows)
+            logger.info(f"Successfully updated existing clip {clip_id} in {csv_path}")
+        else:
+            with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writerow(row)
+            logger.info(f"Successfully appended clip {clip_id} to {csv_path}")
     except Exception as e:
         logger.error(f"Failed to append clip {clip_id} to dataset: {e}")

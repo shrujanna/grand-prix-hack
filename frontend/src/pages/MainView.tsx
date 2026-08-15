@@ -64,7 +64,7 @@ export const MainView: React.FC = () => {
         ? 'The radio tone or words indicate a concerning mood signal. It is a prompt to review, not a diagnosis.'
         : 'No concerning mood or fatigue cue is currently associated with this radio.';
 
-  const analyzeSelectedArchiveRadio = async () => {
+  const analyzeSelectedArchiveRadio = async (overwrite: boolean = false) => {
     const isLocal = activeData?.source === 'local';
     if (!activeData?.date || (isLocal ? !activeData?.clip_id : (!activeData?.session_key || !activeData?.driver_number))) return;
     setAnalyzingArchiveRadio(true);
@@ -80,6 +80,7 @@ export const MainView: React.FC = () => {
       }
       if (activeData.lap_number != null) form.set('lap_number', String(activeData.lap_number));
       if (useDenoiser) form.set('use_denoiser', 'true');
+      if (overwrite) form.set('overwrite', 'true');
       const response = await fetch(`${baseUrl}${isLocal ? '/api/analyze/local-archive' : '/api/analyze/openf1'}`, { method: 'POST', body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this team radio.');
@@ -89,6 +90,22 @@ export const MainView: React.FC = () => {
       setAnalysisError(error.message);
     } finally {
       setAnalyzingArchiveRadio(false);
+    }
+  };
+
+  const saveToDataset = async () => {
+    if (!activeData) return;
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${baseUrl}/api/analyze/save-to-dataset?overwrite=true`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(activeData) 
+      });
+      if (!response.ok) throw new Error('Failed to save to dataset');
+      // Briefly show a success message or just let the continuous learning tab update
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -225,14 +242,24 @@ export const MainView: React.FC = () => {
                       />
                       USE AI DENOISER (SPEECHBRAIN)
                     </label>
-                    <button
-                      type="button"
-                      onClick={analyzeSelectedArchiveRadio}
-                      disabled={analyzingArchiveRadio}
-                      style={{ padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
-                    >
-                      {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => analyzeSelectedArchiveRadio(false)}
+                        disabled={analyzingArchiveRadio}
+                        style={{ flex: 1, padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--accent-f1)', background: analyzingArchiveRadio ? 'var(--bg-panel-solid)' : 'var(--accent-f1)', color: 'white', cursor: analyzingArchiveRadio ? 'wait' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                      >
+                        {analyzingArchiveRadio ? 'ANALYZING RADIO…' : 'TRANSCRIBE + ANALYZE THIS RADIO'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveToDataset}
+                        title="Instantly save the current analysis displayed above into the training dataset without re-running models."
+                        style={{ padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--mood-frustrated)', background: 'transparent', color: 'var(--mood-frustrated)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+                      >
+                        SAVE CURRENT TO DATASET (OVERWRITE)
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
